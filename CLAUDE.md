@@ -49,6 +49,40 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - You must only create documentation files if explicitly requested by the user.
 
+## Project Architecture (`docs/`)
+
+### Core Decisions (always apply — no file read needed)
+
+1. **No custom inventory logic.** All stock operations go through `HasInventory` trait methods + `StockOperationDto`. Never write raw stock SQL or update `inventorix_*` tables directly.
+2. **`Inventorix::bulk()` for all multi-item operations.** Wrap per-line inventory calls in a bulk transaction for atomic rollback.
+3. **Workflow actions on View pages only.** Status transitions (Confirm, Receive, Ship, etc.) are header actions on `ViewXxx` — never inline table actions.
+4. **`App\Models\Location` extends the package model.** No migration needed — it wraps `inventorix_locations`.
+5. **Reservation lifecycle on Sale Orders.** `reservation_id` is stored on `sale_order_items`; never skip Confirm before Ship.
+6. **Resource structure:** `app/Filament/Resources/{PluralModel}/Pages|Schemas|Tables/` — form in `Schemas/`, table in `Tables/`, pages in `Pages/`.
+
+### Doc Lookup (read only the file for the module you are working on)
+
+| Working on | Read |
+|---|---|
+| Categories or Products | `docs/catalog.md` |
+| Locations | `docs/warehouse/locations.md` |
+| Suppliers | `docs/parties/suppliers.md` |
+| Customers | `docs/parties/customers.md` |
+| Purchase Orders | `docs/operations/purchase-orders.md` |
+| Sale Orders | `docs/operations/sale-orders.md` |
+| Transfer Orders | `docs/operations/transfer-orders.md` |
+| Adjustment Orders | `docs/operations/adjustment-orders.md` |
+| Return Orders | `docs/operations/return-orders.md` |
+| Stock Report page | `docs/reports/stock-report.md` |
+| Movement History page | `docs/reports/movement-history.md` |
+| Low Stock Alerts page | `docs/reports/low-stock-alerts.md` |
+| Dashboard widgets | `docs/dashboard/widgets.md` |
+
+**Rules:**
+- Do not read doc files for modules unrelated to the current task.
+- If a doc contradicts existing code, the existing code takes precedence — update the doc instead.
+- `docs/architecture.md` is for human reference only — do not read it during implementation.
+
 ## Replies
 
 - Be concise in your explanations - focus on what's important rather than explaining obvious details.
