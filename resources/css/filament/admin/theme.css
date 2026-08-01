@@ -1,0 +1,128 @@
+@import '/vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../vendor/filament/filament/src';
+@source '../../../../app/Filament';
+@source '../../../../resources/views';
+
+/* ─── Sidebar ─────────────────────────────────────────────── */
+:root {
+    --sidebar-width: 14rem;
+    --collapsed-sidebar-width: 3.5rem;
+}
+
+.fi-sidebar {
+    @apply bg-blue-950! border-r-0!;
+}
+
+/* Logo / brand area */
+.fi-sidebar-header {
+    @apply border-b border-white/10! bg-blue-950!;
+}
+
+/* Navigation group labels */
+.fi-sidebar-group-label {
+    @apply text-xs font-semibold tracking-widest uppercase text-blue-300/60 px-3 py-1.5;
+}
+
+/* Nav items — lighter text when inactive */
+.fi-sidebar-item-button {
+    @apply rounded-md px-3 py-1.5 text-sm gap-x-2 text-blue-100/70 hover:bg-white/10! hover:text-white!;
+}
+
+/* Active nav item */
+.fi-sidebar-item-button.fi-active {
+    @apply bg-white/15! text-white! font-medium;
+}
+
+.fi-sidebar-item-icon {
+    @apply w-4 h-4 text-blue-200;
+}
+.fi-sidebar-item-label {
+    @apply text-blue-200;
+}
+
+/* Active item icon */
+.fi-sidebar-item.fi-active .fi-sidebar-item-icon,.fi-sidebar-item.fi-active .fi-sidebar-item-label  {
+    @apply text-blue-800!;
+}
+
+/* ─── Top header ──────────────────────────────────────────── */
+.fi-topbar {
+    @apply border-b border-gray-100 dark:border-white/10 shadow-none;
+}
+
+/* ─── Page / content area ─────────────────────────────────── */
+.fi-main {
+    @apply p-4 md:p-6;
+}
+
+.fi-page-header {
+    @apply mb-4;
+}
+
+.fi-page-header-heading {
+    @apply text-lg font-semibold;
+}
+
+/* ─── Sections & forms ────────────────────────────────────── */
+.fi-section {
+    @apply shadow-none ring-1 ring-gray-200 dark:ring-white/10 rounded-xl;
+}
+
+.fi-section-header {
+    @apply px-4 py-3 border-b border-gray-100 dark:border-white/10;
+}
+
+.fi-section-content {
+    @apply p-4 gap-3;
+}
+
+/* ─── Tables ──────────────────────────────────────────────── */
+.fi-ta-header-cell {
+    @apply py-2 px-3 text-xs font-medium tracking-wide;
+}
+
+.fi-ta-cell {
+    @apply py-2 px-3 text-sm;
+}
+
+.fi-ta-row {
+    @apply border-b border-gray-100 dark:border-white/5 last:border-0;
+}
+
+/* Remove heavy table wrapper shadow */
+.fi-ta-ctn {
+    @apply shadow-none ring-1 ring-gray-200 dark:ring-white/10 rounded-xl overflow-hidden;
+}
+
+/* ─── Cards / stats widgets ───────────────────────────────── */
+.fi-wi-stats-overview-stat {
+    @apply rounded-xl shadow-none ring-1 ring-gray-200 dark:ring-white/10 p-4;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────── */
+.fi-btn {
+    @apply rounded-lg text-sm font-medium;
+}
+
+.fi-btn-size-md {
+    @apply px-3.5 py-1.5;
+}
+
+/* ─── Form inputs ─────────────────────────────────────────── */
+.fi-input {
+    @apply rounded-lg text-sm;
+}
+
+.fi-fo-field-wrp-label {
+    @apply text-sm font-medium text-gray-700 dark:text-gray-300 mb-0.5;
+}
+
+/* ─── Dropdown / actions menus ────────────────────────────── */
+.fi-dropdown-panel {
+    @apply rounded-xl shadow-lg ring-1 ring-gray-200 dark:ring-white/10;
+}
+
+.fi-dropdown-list-item-label {
+    @apply text-sm;
+}
