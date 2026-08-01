@@ -10,11 +10,10 @@ A production-grade inventory management system built on Laravel 13 + Filament v5
 
 | Group | Module |
 |---|---|
-| Catalog | [Categories, Products](catalog.md) |
-| Warehouse | [Locations](warehouse/locations.md) |
-| Parties | [Suppliers](parties/suppliers.md), [Customers](parties/customers.md) |
-| Operations | [Purchase Orders](operations/purchase-orders.md), [Sale Orders](operations/sale-orders.md), [Transfer Orders](operations/transfer-orders.md), [Adjustment Orders](operations/adjustment-orders.md), [Return Orders](operations/return-orders.md) |
-| Reports | [Stock Report](reports/stock-report.md), [Movement History](reports/movement-history.md), [Low Stock Alerts](reports/low-stock-alerts.md) |
+| Catalog | [Categories, Brands, Units, Products, Addons](catalog.md) |
+| Sales | [Customers](sales/customers.md), [Sale Orders](sales/sale-orders.md), [Customer Returns](sales/customer-returns.md) |
+| Purchase | [Suppliers](purchase/suppliers.md), [Purchase Orders](purchase/purchase-orders.md), [Supplier Returns](purchase/supplier-returns.md) |
+| Inventory | [Locations](inventory/locations.md), [Transfer Orders](inventory/transfer-orders.md), [Adjustment Orders](inventory/adjustment-orders.md), [Stock Report](inventory/stock-report.md), [Movement History](inventory/movement-history.md), [Low Stock Alerts](inventory/low-stock-alerts.md) |
 
 See also: [Dashboard Widgets](dashboard/widgets.md)
 
@@ -40,15 +39,15 @@ See also: [Dashboard Widgets](dashboard/widgets.md)
 
 | # | Milestone | Docs |
 |---|---|---|
-| 1 | Enums, Location, Supplier, Customer | [locations.md](warehouse/locations.md), [suppliers.md](parties/suppliers.md), [customers.md](parties/customers.md) |
-| 2 | Purchase Orders | [purchase-orders.md](operations/purchase-orders.md) |
-| 3 | Sale Orders | [sale-orders.md](operations/sale-orders.md) |
-| 4 | Transfer Orders | [transfer-orders.md](operations/transfer-orders.md) |
-| 5 | Adjustment Orders | [adjustment-orders.md](operations/adjustment-orders.md) |
-| 6 | Return Orders | [return-orders.md](operations/return-orders.md) |
-| 7 | Dashboard Widgets | [widgets.md](dashboard/widgets.md) |
-| 8 | Report Pages | [reports/](reports/) |
-| 9 | Nav groups, scheduling, formatting | [architecture.md](architecture.md) |
+| 1 | Enums, Brands, Addons, Location, Supplier, Customer | [catalog.md](catalog.md), [inventory/locations.md](inventory/locations.md), [purchase/suppliers.md](purchase/suppliers.md), [sales/customers.md](sales/customers.md) |
+| 2 | Purchase Orders | [purchase/purchase-orders.md](purchase/purchase-orders.md) |
+| 3 | Sale Orders | [sales/sale-orders.md](sales/sale-orders.md) |
+| 4 | Transfer Orders | [inventory/transfer-orders.md](inventory/transfer-orders.md) |
+| 5 | Adjustment Orders | [inventory/adjustment-orders.md](inventory/adjustment-orders.md) |
+| 6 | Return Orders | [sales/customer-returns.md](sales/customer-returns.md), [purchase/supplier-returns.md](purchase/supplier-returns.md) |
+| 7 | Dashboard Widgets | [dashboard/widgets.md](dashboard/widgets.md) |
+| 8 | Report Pages | [inventory/stock-report.md](inventory/stock-report.md), [inventory/movement-history.md](inventory/movement-history.md), [inventory/low-stock-alerts.md](inventory/low-stock-alerts.md) |
+| 9 | Nav groups, scheduling, formatting | — |
 
 ---
 

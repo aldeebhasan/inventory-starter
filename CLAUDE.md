@@ -64,18 +64,15 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 | Working on | Read |
 |---|---|
-| Categories or Products | `docs/catalog.md` |
-| Locations | `docs/warehouse/locations.md` |
-| Suppliers | `docs/parties/suppliers.md` |
-| Customers | `docs/parties/customers.md` |
-| Purchase Orders | `docs/operations/purchase-orders.md` |
-| Sale Orders | `docs/operations/sale-orders.md` |
-| Transfer Orders | `docs/operations/transfer-orders.md` |
-| Adjustment Orders | `docs/operations/adjustment-orders.md` |
-| Return Orders | `docs/operations/return-orders.md` |
-| Stock Report page | `docs/reports/stock-report.md` |
-| Movement History page | `docs/reports/movement-history.md` |
-| Low Stock Alerts page | `docs/reports/low-stock-alerts.md` |
+| Categories, Brands, Units, Products, Addons | `docs/catalog.md` |
+| Customers, Sale Orders, Customer Returns | `docs/sales/customers.md`, `docs/sales/sale-orders.md`, `docs/sales/customer-returns.md` |
+| Suppliers, Purchase Orders, Supplier Returns | `docs/purchase/suppliers.md`, `docs/purchase/purchase-orders.md`, `docs/purchase/supplier-returns.md` |
+| Locations | `docs/inventory/locations.md` |
+| Transfer Orders | `docs/inventory/transfer-orders.md` |
+| Adjustment Orders | `docs/inventory/adjustment-orders.md` |
+| Stock Report page | `docs/inventory/stock-report.md` |
+| Movement History page | `docs/inventory/movement-history.md` |
+| Low Stock Alerts page | `docs/inventory/low-stock-alerts.md` |
 | Dashboard widgets | `docs/dashboard/widgets.md` |
 
 **Rules:**
