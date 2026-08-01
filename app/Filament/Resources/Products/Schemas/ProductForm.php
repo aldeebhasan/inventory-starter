@@ -15,7 +15,7 @@ class ProductForm
         return $schema
             ->components([
                 TextInput::make('name')->required(),
-                Select::make('category_id')->relationship('category','name')->required(),
+                Select::make('category_id')->relationship('category', 'name')->required(),
                 TextInput::make('price')->numeric()->required(),
                 TextInput::make('cost')->numeric()->required(),
                 Textarea::make('description'),

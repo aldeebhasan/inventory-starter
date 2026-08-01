@@ -19,10 +19,10 @@ class ProductsTable
     {
         return $table
             ->columns([
-                ImageColumn::make('image')->square()->defaultImageUrl(asset("images/default.png")),
+                ImageColumn::make('image')->square()->defaultImageUrl(asset('images/default.png')),
                 TextColumn::make('name')->sortable()->searchable(),
                 TextColumn::make('price')->numeric()->sortable(),
-                TextColumn::make('cost')->numeric()->sortable()
+                TextColumn::make('cost')->numeric()->sortable(),
             ])
             ->filters([
                 TrashedFilter::make(),

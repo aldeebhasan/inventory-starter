@@ -9,5 +9,5 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['name', 'image'])]
 class Category extends Model
 {
-    use  SoftDeletes;
+    use SoftDeletes;
 }
