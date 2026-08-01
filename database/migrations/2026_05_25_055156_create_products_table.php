@@ -15,10 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name', 500);
             $table->string('image', 255)->nullable();
-            $table->text('description');
+            $table->text('description')->nullable();
             $table->decimal('price', 12, 3);
             $table->decimal('cost', 12, 3);
-            $table->foreignId('category_id')->nullable()->index()->constrained()->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
         });

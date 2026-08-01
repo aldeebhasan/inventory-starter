@@ -10,15 +10,20 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class SupplierFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
-            //
+            'name' => fake()->unique()->company(),
+            'email' => fake()->unique()->companyEmail(),
+            'phone' => fake()->phoneNumber(),
+            'address' => fake()->address(),
+            'tax_number' => fake()->numerify('TAX-#####'),
+            'is_active' => true,
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(['is_active' => false]);
     }
 }

@@ -10,15 +10,13 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class UnitFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
-            //
+            'name' => fake()->unique()->word(),
+            'abbreviation' => fake()->unique()->lexify('??'),
+            'base_unit_id' => null,
+            'conversion_factor' => 1,
         ];
     }
 }
