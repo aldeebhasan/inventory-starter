@@ -32,8 +32,6 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Blue,
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
-            ->sidebarWidth('14rem')
-            ->collapsedSidebarWidth('3.5rem')
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
