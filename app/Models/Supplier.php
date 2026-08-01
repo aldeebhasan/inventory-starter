@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\SupplierFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
+#[Fillable(['name', 'email', 'phone', 'address', 'tax_number', 'is_active'])]
+class Supplier extends Model
+{
+    /** @use HasFactory<SupplierFactory> */
+    use HasFactory;
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'product_supplier')
+            ->withPivot(['unit_cost', 'supplier_sku']);
+    }
+}

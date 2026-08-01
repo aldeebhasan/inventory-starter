@@ -1,37 +1,40 @@
 <?php
 
-namespace App\Filament\Resources\Products\Tables;
+namespace App\Filament\Resources\Brands\Tables;
 
 use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
-class ProductsTable
+class BrandsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                ImageColumn::make('image')->square()->defaultImageUrl(asset('images/default.png')),
+                ImageColumn::make('logo'),
                 TextColumn::make('name')->sortable()->searchable(),
-                TextColumn::make('brand.name')->sortable(),
-                TextColumn::make('categories_count')->counts('categories')->label('Categories'),
-                TextColumn::make('price')->numeric()->sortable(),
-                TextColumn::make('cost')->numeric()->sortable(),
+                IconColumn::make('is_active')->boolean(),
+                TextColumn::make('products_count')
+                    ->counts('products')
+                    ->label('Products'),
             ])
             ->filters([
+                TernaryFilter::make('is_active'),
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make(),
                 EditAction::make(),
+                DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
