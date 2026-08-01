@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PurchaseOrders\Pages;
 
 use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
+use App\Models\PurchaseOrder;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
@@ -17,7 +18,9 @@ class EditPurchaseOrder extends EditRecord
     {
         parent::mount($record);
 
-        if ($this->record->status !== PurchaseOrderStatus::Draft) {
+        /** @var PurchaseOrder $record */
+        $record = $this->record;
+        if ($record->status !== PurchaseOrderStatus::Draft) {
             abort(403, 'Only draft purchase orders can be edited.');
         }
     }

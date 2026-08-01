@@ -17,7 +17,7 @@ class SaleOrderFactory extends Factory
     {
         return [
             'customer_id' => Customer::factory(),
-            'location_id' => fn () => Location::create([
+            'location_id' => fn () => Location::query()->create([
                 'name' => fake()->city(),
                 'is_active' => true,
                 'meta' => ['type' => 'warehouse'],

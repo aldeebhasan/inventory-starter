@@ -3,14 +3,30 @@
 namespace App\Models;
 
 use App\Enums\SaleOrderStatus;
+use Carbon\Carbon;
 use Database\Factories\SaleOrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property string $order_number
+ * @property int $customer_id
+ * @property int $location_id
+ * @property SaleOrderStatus $status
+ * @property Carbon $ordered_at
+ * @property Carbon|null $shipped_at
+ * @property string|null $notes
+ * @property int|null $created_by
+ * @property-read Collection<int, SaleOrderItem> $items
+ * @property-read Customer $customer
+ * @property-read Location $location
+ */
 #[Fillable(['order_number', 'customer_id', 'location_id', 'status', 'ordered_at', 'shipped_at', 'notes', 'created_by'])]
 class SaleOrder extends Model
 {
@@ -28,7 +44,7 @@ class SaleOrder extends Model
         parent::boot();
 
         static::creating(function (SaleOrder $model) {
-            $model->order_number = 'SO-'.str_pad(static::max('id') + 1, 5, '0', STR_PAD_LEFT);
+            $model->order_number = 'SO-'.str_pad((string) ((int) static::query()->max('id') + 1), 5, '0', STR_PAD_LEFT);
         });
     }
 

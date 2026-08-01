@@ -53,8 +53,10 @@ Brand ──< Product >──< Category
 
 ### `Unit`
 - Traits: `HasFactory`
-- `#[Fillable(['name', 'abbreviation'])]`
-- Relationships: `products()` hasMany
+- `#[Fillable(['name', 'abbreviation', 'base_unit_id', 'conversion_factor'])]`
+- Casts: `conversion_factor => float`
+- Relationships: `products()` hasMany, `baseUnit()` belongsTo self, `derivedUnits()` hasMany self
+- Method: `convertQty(float $qty): float` — multiplies `$qty` by `conversion_factor` if this is a derived unit; returns `$qty` unchanged if this is a base unit (no `base_unit_id`)
 
 ### `Brand`
 - Traits: `HasFactory`, `SoftDeletes`
@@ -97,6 +99,10 @@ Brand ──< Product >──< Category
 |---|---|---|
 | name | TextInput | required, e.g. "Kilogram" |
 | abbreviation | TextInput | required, max 20, e.g. "kg" |
+| base_unit_id | Select | relationship('baseUnit', 'name'), nullable — designates this as a derived unit |
+| conversion_factor | TextInput | numeric, default 1, visible only when base_unit_id is set — "1 {abbr} = {factor} {base abbr}" |
+
+**Unit conversion rule:** `conversion_factor` expresses how many base-unit quantities equal 1 of this unit. Example: 1 Ton = 1000 kg → set base_unit to "Kilogram", conversion_factor = 1000.
 
 **Table (`Tables/UnitsTable.php`)**
 

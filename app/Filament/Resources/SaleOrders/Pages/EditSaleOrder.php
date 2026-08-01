@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SaleOrders\Pages;
 
 use App\Enums\SaleOrderStatus;
 use App\Filament\Resources\SaleOrders\SaleOrderResource;
+use App\Models\SaleOrder;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
@@ -17,7 +18,9 @@ class EditSaleOrder extends EditRecord
     {
         parent::mount($record);
 
-        if ($this->record->status !== SaleOrderStatus::Draft) {
+        /** @var SaleOrder $record */
+        $record = $this->record;
+        if ($record->status !== SaleOrderStatus::Draft) {
             abort(403, 'Only draft sale orders can be edited.');
         }
     }

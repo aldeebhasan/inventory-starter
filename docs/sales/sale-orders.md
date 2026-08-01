@@ -21,7 +21,7 @@ Cancel:  releaseReservation() per item (if reservations exist)
 ## Models
 
 - `SaleOrder` — `HasFactory`, `SoftDeletes`; casts: `status => SaleOrderStatus`, `ordered_at`, `shipped_at` as datetime; relationships: `customer()`, `location()`, `items()`, `createdBy()`, `customerReturns()` morphMany ReturnOrder
-- `SaleOrderItem` — relationships: `saleOrder()`, `product()`, `reservation()` belongsTo `Aldeebhasan\Inventorix\Models\Reservation`
+- `SaleOrderItem` — `#[Fillable([..., 'unit_id', ...])]`; relationships: `saleOrder()`, `product()`, `unit()` belongsTo Unit, `reservation()` belongsTo `Aldeebhasan\Inventorix\Models\Reservation`; method: `convertedQuantity(): float` — returns `quantity` converted to the product's base unit via `unit->convertQty()`
 
 ## Filament Resource
 
@@ -37,7 +37,7 @@ Cancel:  releaseReservation() per item (if reservations exist)
 | location_id | Select | relationship('location', 'name'), searchable, required |
 | ordered_at | DateTimePicker | default now(), required |
 | notes | Textarea | nullable |
-| items | Repeater | relationship() — product_id (span 2), quantity (span 1), unit_price (span 1) |
+| items | Repeater | relationship(), defaultItems(0) — Grid(5): product_id (span 2, live), unit_id (span 1, auto-fills from product.unit_id, shows product unit + derived units), quantity (span 1), unit_price (span 1) |
 
 ### Table (`Tables/SaleOrdersTable.php`)
 
@@ -70,7 +70,7 @@ Action::make('confirm')
                     reference: $item,
                     createdBy: auth()->id(),
                 );
-                $reservation = $item->product->reserve($item->quantity, $record->location_id, $dto);
+                $reservation = $item->product->reserve($item->convertedQuantity(), $record->location_id, $dto); // converts derived unit → base unit
                 $item->update(['reservation_id' => $reservation->id]);
             }
             $record->update(['status' => SaleOrderStatus::Confirmed]);

@@ -16,7 +16,7 @@ Draft ──[Confirm]──> Confirmed ──[Receive]──> Received
 ## Models
 
 - `PurchaseOrder` — `HasFactory`, `SoftDeletes`; casts: `status => PurchaseOrderStatus`, `ordered_at`, `received_at` as datetime; relationships: `supplier()`, `location()`, `items()`, `createdBy()`, `supplierReturns()` morphMany ReturnOrder
-- `PurchaseOrderItem` — relationships: `purchaseOrder()`, `product()`
+- `PurchaseOrderItem` — `#[Fillable([..., 'unit_id', ...])]`; relationships: `purchaseOrder()`, `product()`, `unit()` belongsTo Unit; method: `convertedQuantity(): float` — returns `quantity` converted to the product's base unit via `unit->convertQty()`
 
 ## Filament Resource
 
@@ -32,7 +32,7 @@ Draft ──[Confirm]──> Confirmed ──[Receive]──> Received
 | location_id | Select | relationship('location', 'name'), searchable, required |
 | ordered_at | DateTimePicker | default now(), required |
 | notes | Textarea | nullable |
-| items | Repeater | relationship() — product_id (span 2), quantity (span 1), unit_cost (span 1); product_id is `->live()` and pre-fills unit_cost from `product_supplier` pivot for the order's supplier |
+| items | Repeater | relationship(), defaultItems(0) — Grid(5): product_id (span 2, live), unit_id (span 1, auto-fills from product.unit_id, shows product unit + derived units), quantity (span 1), unit_cost (span 1); product_id afterStateUpdated pre-fills unit_id and unit_cost from product_supplier pivot |
 
 ### Table (`Tables/PurchaseOrdersTable.php`)
 
@@ -76,8 +76,9 @@ Action::make('receive')
                         cost: $item->unit_cost,
                         createdBy: auth()->id(),
                     );
-                    $item->product->addStock($item->quantity, $record->location_id, $dto);
-                    $item->update(['received_quantity' => $item->quantity]);
+                    $convertedQty = $item->convertedQuantity(); // converts derived unit → base unit
+                    $item->product->addStock($convertedQty, $record->location_id, $dto);
+                    $item->update(['received_quantity' => $convertedQty]);
                 }
             });
             $record->update(['status' => PurchaseOrderStatus::Received, 'received_at' => now()]);

@@ -17,7 +17,7 @@ class PurchaseOrderFactory extends Factory
     {
         return [
             'supplier_id' => Supplier::factory(),
-            'location_id' => fn () => Location::create([
+            'location_id' => fn () => Location::query()->create([
                 'name' => fake()->city(),
                 'is_active' => true,
                 'meta' => ['type' => 'warehouse'],

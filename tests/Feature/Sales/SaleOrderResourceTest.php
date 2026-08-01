@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
+use App\Models\Unit;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
@@ -202,6 +203,43 @@ it('cannot edit a confirmed sale order', function () {
 
     $this->get(route('filament.admin.resources.sale-orders.edit', $order))
         ->assertForbidden();
+});
+
+it('converts derived unit quantity to base unit on confirm reservation', function () {
+    $baseUnit = Unit::create(['name' => 'Kilogram', 'abbreviation' => 'kg']);
+    $derivedUnit = Unit::create([
+        'name' => 'Ton',
+        'abbreviation' => 't',
+        'base_unit_id' => $baseUnit->id,
+        'conversion_factor' => 1000,
+    ]);
+    $product = Product::factory()->create(['unit_id' => $baseUnit->id]);
+    $product->addStock(5000, $this->location->id); // 5000 kg in stock
+
+    $order = SaleOrder::factory()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+        'status' => SaleOrderStatus::Draft,
+    ]);
+    $item = SaleOrderItem::factory()->create([
+        'sale_order_id' => $order->id,
+        'product_id' => $product->id,
+        'unit_id' => $derivedUnit->id,
+        'quantity' => 2, // 2 tons = 2000 kg
+    ]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->callAction('confirm');
+
+    expect($order->fresh()->status)->toBe(SaleOrderStatus::Confirmed);
+    expect($item->fresh()->reservation_id)->not->toBeNull();
+
+    // Reservation should be for 2000 kg (2 tons × 1000)
+    assertDatabaseHas('inventorix_reservations', [
+        'stockable_type' => Product::class,
+        'stockable_id' => $product->id,
+        'quantity' => 2000,
+    ]);
 });
 
 it('can filter sale orders by status', function () {

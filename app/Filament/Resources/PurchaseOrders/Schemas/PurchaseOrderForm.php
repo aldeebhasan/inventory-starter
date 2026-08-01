@@ -4,6 +4,8 @@ namespace App\Filament\Resources\PurchaseOrders\Schemas;
 
 use App\Models\Location;
 use App\Models\Product;
+use App\Models\Supplier;
+use App\Models\Unit;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -42,7 +44,7 @@ class PurchaseOrderForm
                     ->relationship()
                     ->defaultItems(0)
                     ->schema([
-                        Grid::make(4)->schema([
+                        Grid::make(5)->schema([
                             Select::make('product_id')
                                 ->relationship('product', 'name')
                                 ->searchable()
@@ -50,15 +52,35 @@ class PurchaseOrderForm
                                 ->live()
                                 ->columnSpan(2)
                                 ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                    $product = Product::query()->find((int) $state);
+                                    $set('unit_id', $product?->unit_id);
+
                                     $supplierId = $get('../../supplier_id');
                                     if ($state && $supplierId) {
-                                        $product = Product::find($state);
-                                        $pivot = $product?->suppliers()->where('supplier_id', $supplierId)->first()?->pivot;
-                                        if ($pivot?->unit_cost) {
-                                            $set('unit_cost', $pivot->unit_cost);
+                                        /** @var Supplier|null $supplier */
+                                        $supplier = $product?->suppliers()->where('supplier_id', $supplierId)->first();
+                                        /** @phpstan-ignore property.notFound */
+                                        if ($supplier?->pivot?->unit_cost) {
+                                            $set('unit_cost', $supplier->pivot->unit_cost);
                                         }
                                     }
                                 }),
+                            Select::make('unit_id')
+                                ->label('Unit')
+                                ->options(function (Get $get): array {
+                                    $product = Product::query()->find((int) $get('product_id'));
+                                    if (! $product?->unit_id) {
+                                        return Unit::query()->whereNull('base_unit_id')->pluck('name', 'id')->toArray();
+                                    }
+
+                                    return Unit::query()->where('id', $product->unit_id)
+                                        ->orWhere('base_unit_id', $product->unit_id)
+                                        ->pluck('name', 'id')
+                                        ->toArray();
+                                })
+                                ->nullable()
+                                ->searchable()
+                                ->columnSpan(1),
                             TextInput::make('quantity')
                                 ->numeric()
                                 ->required()

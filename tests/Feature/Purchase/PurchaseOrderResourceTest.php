@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Models\Unit;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
@@ -174,6 +175,70 @@ it('cannot edit a confirmed purchase order', function () {
 
     $this->get(route('filament.admin.resources.purchase-orders.edit', $order))
         ->assertForbidden();
+});
+
+it('converts derived unit quantity to base unit on receive', function () {
+    $baseUnit = Unit::create(['name' => 'Kilogram', 'abbreviation' => 'kg']);
+    $derivedUnit = Unit::create([
+        'name' => 'Ton',
+        'abbreviation' => 't',
+        'base_unit_id' => $baseUnit->id,
+        'conversion_factor' => 1000,
+    ]);
+    $product = Product::factory()->create(['unit_id' => $baseUnit->id]);
+    $order = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'location_id' => $this->location->id,
+        'status' => PurchaseOrderStatus::Confirmed,
+    ]);
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $order->id,
+        'product_id' => $product->id,
+        'unit_id' => $derivedUnit->id,
+        'quantity' => 2, // 2 tons
+        'unit_cost' => 500,
+    ]);
+
+    Livewire::test(ViewPurchaseOrder::class, ['record' => $order->id])
+        ->callAction('receive');
+
+    // 2 tons × 1000 = 2000 kg should be added to stock
+    assertDatabaseHas('inventorix_stocks', [
+        'stockable_type' => Product::class,
+        'stockable_id' => $product->id,
+        'location_id' => $this->location->id,
+        'quantity' => 2000,
+    ]);
+
+    assertDatabaseHas('purchase_order_items', [
+        'purchase_order_id' => $order->id,
+        'received_quantity' => 2000,
+    ]);
+});
+
+it('uses quantity as-is when item has no unit or base unit', function () {
+    $product = Product::factory()->create(['unit_id' => null]);
+    $order = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'location_id' => $this->location->id,
+        'status' => PurchaseOrderStatus::Confirmed,
+    ]);
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $order->id,
+        'product_id' => $product->id,
+        'unit_id' => null,
+        'quantity' => 10,
+        'unit_cost' => 5,
+    ]);
+
+    Livewire::test(ViewPurchaseOrder::class, ['record' => $order->id])
+        ->callAction('receive');
+
+    assertDatabaseHas('inventorix_stocks', [
+        'stockable_type' => Product::class,
+        'stockable_id' => $product->id,
+        'quantity' => 10,
+    ]);
 });
 
 it('can filter purchase orders by status', function () {
