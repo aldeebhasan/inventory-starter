@@ -16,5 +16,4 @@ class ListProducts extends ListRecords
             CreateAction::make(),
         ];
     }
-
 }
