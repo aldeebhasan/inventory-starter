@@ -1,7 +1,7 @@
 # Catalog
 
 **Navigation Group:** Catalog
-**Resources:** Categories, Brands, Units, Products (Addons managed via RelationManager on Product)
+**Resources:** Categories, Brands, Units, Addons, Products
 
 ---
 
@@ -9,7 +9,7 @@
 
 ```
 Brand ──< Product >──< Category
-         │       └──< Addon
+         │       └──<(pivot)── Addon  (product_addon)
          │       └──>──< Supplier  (pivot: unit_cost, supplier_sku)
          └── Unit (unit of measure)
 ```
@@ -26,8 +26,13 @@ Brand ──< Product >──< Category
 **`brands`**
 - id, name, logo nullable, is_active bool default true, timestamps, softDeletes
 
-**`addons`**
-- id, product_id FK → products CASCADE, name, price decimal(12,3), description text nullable, is_active bool default true, timestamps, softDeletes
+**`addons`** (standalone — not tied to a product in this table)
+- id, name, price decimal(12,3), description text nullable, is_active bool default true, timestamps, softDeletes
+
+**`product_addon`** (pivot)
+- product_id FK → products CASCADE
+- addon_id FK → addons CASCADE
+- Unique: (product_id, addon_id)
 
 **`category_product`** (pivot)
 - category_id FK → categories CASCADE
@@ -68,9 +73,10 @@ Brand ──< Product >──< Category
 
 ### `Addon`
 - Traits: `HasFactory`, `SoftDeletes`
-- `#[Fillable(['product_id', 'name', 'price', 'description', 'is_active'])]`
+- `#[Fillable(['name', 'price', 'description', 'is_active'])]`
 - Casts: `price => decimal:3`, `is_active => boolean`
-- Relationships: `product()` belongsTo Product
+- Relationships: `products()` belongsToMany Product (via `product_addon`)
+- **No `product_id` column** — addons are standalone entities reusable across products
 
 ### `Product` (update existing)
 - Remove: `category()` belongsTo — **drop this relationship**
@@ -78,7 +84,7 @@ Brand ──< Product >──< Category
   - `brand()` belongsTo Brand
   - `unit()` belongsTo Unit
   - `categories()` belongsToMany Category (via `category_product`)
-  - `addons()` hasMany Addon
+  - `addons()` belongsToMany Addon (via `product_addon`)
   - `suppliers()` belongsToMany Supplier (via `product_supplier`) `->withPivot(['unit_cost', 'supplier_sku'])`
 - Update `#[Fillable]`: replace `category_id` with `brand_id`, add `unit_id`
 
@@ -147,6 +153,39 @@ Pages: `ListBrands`, `CreateBrand`, `EditBrand`
 
 ---
 
+### `AddonResource`
+**Path:** `app/Filament/Resources/Addons/`
+**Navigation Group:** Catalog
+**Icon:** `Heroicon::OutlinedPuzzlePiece`
+
+Addons are standalone catalog items. They are defined once and then attached to products via the `product_addon` pivot. The same addon can be attached to a product multiple times (e.g., "Gift Wrap × 2").
+
+**Form (`Schemas/AddonForm.php`)**
+
+| Field | Type | Notes |
+|---|---|---|
+| name | TextInput | required |
+| price | TextInput | numeric, required, min 0 |
+| description | Textarea | nullable |
+| is_active | Toggle | default true |
+
+**Table (`Tables/AddonsTable.php`)**
+
+| Column | Notes |
+|---|---|
+| name | sortable, searchable |
+| price | money format, sortable |
+| is_active | IconColumn boolean |
+| products_count | counts('products'), label 'Products' |
+
+Filters: `TernaryFilter` on is_active, `TrashedFilter`
+Actions: `EditAction`, `DeleteAction`
+Bulk: `DeleteBulkAction`, `ForceDeleteBulkAction`, `RestoreBulkAction`
+
+Pages: `ListAddons`, `CreateAddon`, `EditAddon`
+
+---
+
 ### `CategoryResource` (update existing)
 
 Only add `$navigationGroup = 'Catalog'`. No form/table changes needed.
@@ -167,6 +206,18 @@ Add `$navigationGroup = 'Catalog'`.
 | Add | `Select::make('unit_id')->relationship('unit', 'name')->searchable()->nullable()->helperText('Unit of measure, e.g. kg, piece')` |
 | Add | `Select::make('suppliers')->multiple()->relationship('suppliers', 'name')->searchable()` |
 
+**Addon attachment on Product**
+
+Addons use the same pattern as categories — a simple multi-select:
+
+```php
+Select::make('addons')
+    ->multiple()
+    ->relationship('addons', 'name')
+    ->searchable()
+    ->preload()
+```
+
 **Table changes (`Tables/ProductsTable.php`)**
 
 | Change | Detail |
@@ -179,14 +230,7 @@ Add `$navigationGroup = 'Catalog'`.
 
 Add stock summary table per location sourced from `inventorix_stocks`.
 
-**Relation Manager**
-
-Add `AddonsRelationManager` on the View/Edit page:
-- Table columns: name, price, is_active
-- Form: name (TextInput), price (TextInput numeric), description (Textarea), is_active (Toggle)
-- Actions: CreateAction, EditAction, DeleteAction
-
-Pages: `ListProducts`, `CreateProduct`, `ViewProduct` (with AddonsRelationManager), `EditProduct`
+Pages: `ListProducts`, `CreateProduct`, `ViewProduct`, `EditProduct`
 
 ---
 

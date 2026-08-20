@@ -6,10 +6,10 @@ use Database\Factories\AddonFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['product_id', 'name', 'price', 'description', 'is_active'])]
+#[Fillable(['name', 'price', 'description', 'is_active'])]
 class Addon extends Model
 {
     /** @use HasFactory<AddonFactory> */
@@ -20,8 +20,8 @@ class Addon extends Model
         'is_active' => 'boolean',
     ];
 
-    public function product(): BelongsTo
+    public function products(): BelongsToMany
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsToMany(Product::class, 'product_addon');
     }
 }

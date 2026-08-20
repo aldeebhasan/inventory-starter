@@ -46,6 +46,11 @@ class ProductForm
                     ->multiple()
                     ->relationship('suppliers', 'name')
                     ->searchable(),
+                Select::make('addons')
+                    ->multiple()
+                    ->relationship('addons', 'name')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('price')->numeric()->required(),
                 TextInput::make('cost')->numeric()->required(),
                 Textarea::make('description'),
