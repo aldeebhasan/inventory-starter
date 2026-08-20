@@ -11,17 +11,17 @@
 }
 
 .fi-sidebar {
-    @apply bg-blue-950! border-r-0!;
+    @apply bg-blue-950 dark:bg-gray-900 border-r-0!;
 }
 
 /* Logo / brand area */
 .fi-sidebar-header {
-    @apply border-b border-white/10! bg-blue-950!;
+    @apply border-b border-white/10! bg-blue-950 dark:bg-gray-900;
 }
 
 /* Navigation group labels */
 .fi-sidebar-group-label {
-    @apply text-xs font-semibold tracking-widest uppercase text-blue-300/60 px-3 py-1.5;
+    @apply text-xs font-semibold tracking-widest uppercase text-blue-300/60 dark:text-gray-400 px-3 py-1.5;
 }
 
 /* Nav items — lighter text when inactive */
@@ -35,15 +35,15 @@
 }
 
 .fi-sidebar-item-icon {
-    @apply w-4 h-4 text-blue-200;
+    @apply w-4 h-4 text-blue-200 dark:text-gray-200;
 }
 .fi-sidebar-item-label {
-    @apply text-blue-200;
+    @apply text-blue-200 dark:text-gray-200;
 }
 
 /* Active item icon */
 .fi-sidebar-item.fi-active .fi-sidebar-item-icon,.fi-sidebar-item.fi-active .fi-sidebar-item-label  {
-    @apply text-blue-800!;
+    @apply text-blue-800 dark:text-gray-400;
 }
 
 /* ─── Top header ──────────────────────────────────────────── */
@@ -116,6 +116,38 @@
 
 .fi-fo-field-wrp-label {
     @apply text-sm font-medium text-gray-700 dark:text-gray-300 mb-0.5;
+}
+
+/* ─── Page header ─────────────────────────────────────────── */
+.fi-header {
+    @apply bg-blue-200/20 dark:bg-white/5 border border-blue-100 dark:border-white/10 rounded-xl px-5 py-4 ;
+}
+
+/* ─── Breadcrumbs ─────────────────────────────────────────── */
+.fi-breadcrumbs {
+    @apply inline-flex;
+}
+
+.fi-breadcrumbs-list {
+    @apply flex items-center gap-x-1 text-sm;
+}
+
+.fi-breadcrumbs-item {
+    @apply flex items-center gap-x-1;
+}
+
+.fi-breadcrumbs-item-separator {
+    @apply w-3.5 h-3.5 text-gray-300 dark:text-white/20;
+}
+
+/* Linked breadcrumb items */
+a.fi-breadcrumbs-item-label {
+    @apply text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors;
+}
+
+/* Current page (non-linked) */
+span.fi-breadcrumbs-item-label {
+    @apply text-gray-500 dark:text-white/40;
 }
 
 /* ─── Dropdown / actions menus ────────────────────────────── */
