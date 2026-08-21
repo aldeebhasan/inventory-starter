@@ -38,18 +38,8 @@ use LogicException;
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasInventory;
 
-    use HasInventory {
-        addStock as protected inventoryAddStock;
-        deductStock as protected inventoryDeductStock;
-        adjustStock as protected inventoryAdjustStock;
-        adjustStockByReference as protected inventoryAdjustStockByReference;
-        transferStock as protected inventoryTransferStock;
-        reserve as protected inventoryReserve;
-        releaseReservation as protected inventoryReleaseReservation;
-        fulfillReservation as protected inventoryFulfillReservation;
-    }
 
     protected $casts = [
         'price' => 'float',

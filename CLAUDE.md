@@ -71,6 +71,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 | Locations | `docs/inventory/locations.md` |
 | Transfer Orders | `docs/inventory/transfer-orders.md` |
 | Adjustment Orders | `docs/inventory/adjustment-orders.md` |
+| Inventories page | `docs/inventory/inventories.md` |
 | Stock Report page | `docs/inventory/stock-report.md` |
 | Movement History page | `docs/inventory/movement-history.md` |
 | Low Stock Alerts page | `docs/inventory/low-stock-alerts.md` |
