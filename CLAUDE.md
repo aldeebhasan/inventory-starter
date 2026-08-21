@@ -63,19 +63,20 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ### Doc Lookup (read only the file for the module you are working on)
 
-| Working on | Read |
-|---|---|
+| Working on                                  | Read |
+|---------------------------------------------|---|
 | Categories, Brands, Units, Products, Addons | `docs/catalog.md` |
-| Customers, Sale Orders, Customer Returns | `docs/sales/customers.md`, `docs/sales/sale-orders.md`, `docs/sales/customer-returns.md` |
+| Customers, Sale Orders, Customer Returns    | `docs/sales/customers.md`, `docs/sales/sale-orders.md`, `docs/sales/customer-returns.md` |
 | Suppliers, Purchase Orders, Supplier Returns | `docs/purchase/suppliers.md`, `docs/purchase/purchase-orders.md`, `docs/purchase/supplier-returns.md` |
-| Locations | `docs/inventory/locations.md` |
-| Transfer Orders | `docs/inventory/transfer-orders.md` |
-| Adjustment Orders | `docs/inventory/adjustment-orders.md` |
-| Inventories page | `docs/inventory/inventories.md` |
-| Stock Report page | `docs/inventory/stock-report.md` |
-| Movement History page | `docs/inventory/movement-history.md` |
-| Low Stock Alerts page | `docs/inventory/low-stock-alerts.md` |
-| Dashboard widgets | `docs/dashboard/widgets.md` |
+| Locations                                   | `docs/inventory/locations.md` |
+| Transfer Orders                             | `docs/inventory/transfer-orders.md` |
+| Adjustment Orders                           | `docs/inventory/adjustment-orders.md` |
+| Stocks page                                 | `docs/inventory/inventories.md` |
+| Stocks  Transactions page                   | `docs/inventory/inventory-transactions.md` |
+| Stock Report page                           | `docs/inventory/stock-report.md` |
+| Movement History page                       | `docs/inventory/movement-history.md` |
+| Low Stock Alerts page                       | `docs/inventory/low-stock-alerts.md` |
+| Dashboard widgets                           | `docs/dashboard/widgets.md` |
 
 **Rules:**
 - Do not read doc files for modules unrelated to the current task.

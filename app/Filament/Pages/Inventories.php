@@ -30,11 +30,11 @@ class Inventories extends Page implements HasTable
 
     protected static string|UnitEnum|null $navigationGroup = 'Inventory';
 
-    protected static ?string $navigationLabel = 'Inventories';
+    protected static ?string $navigationLabel = 'Stocks';
 
     public function getTitle(): string|Htmlable
     {
-        return 'Inventories';
+        return 'Stocks';
     }
 
     public function table(Table $table): Table

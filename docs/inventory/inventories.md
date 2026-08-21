@@ -1,6 +1,7 @@
-# Inventories
+# Stocks (Inventories)
 
 **Navigation Group:** Inventory
+**Navigation Label:** Stocks
 **Type:** Custom Filament Page with table (`InteractsWithTable`)
 **Path:** `app/Filament/Pages/Inventories.php`
 **Icon:** `Heroicon::OutlinedArchiveBox`
