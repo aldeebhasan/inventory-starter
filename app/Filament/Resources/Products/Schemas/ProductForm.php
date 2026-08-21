@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Enums\ProductType;
 use App\Models\Unit;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
@@ -19,6 +20,10 @@ class ProductForm
         return $schema
             ->components([
                 TextInput::make('name')->required(),
+                Select::make('type')
+                    ->options(ProductType::class)
+                    ->default(ProductType::Inventory)
+                    ->required(),
                 Select::make('categories')
                     ->multiple()
                     ->relationship('categories', 'name')

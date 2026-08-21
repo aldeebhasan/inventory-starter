@@ -50,6 +50,7 @@ Brand ──< Product >──< Category
 
 - **Add** `brand_id` FK → brands.id nullOnDelete nullable
 - **Add** `unit_id` FK → units.id nullOnDelete nullable
+- **Add** `type` varchar default `'inventory'` — values: `inventory` | `non_inventory`
 - **Drop** `category_id` — replaced by `category_product` pivot
 
 ---
@@ -86,7 +87,10 @@ Brand ──< Product >──< Category
   - `categories()` belongsToMany Category (via `category_product`)
   - `addons()` belongsToMany Addon (via `product_addon`)
   - `suppliers()` belongsToMany Supplier (via `product_supplier`) `->withPivot(['unit_cost', 'supplier_sku'])`
-- Update `#[Fillable]`: replace `category_id` with `brand_id`, add `unit_id`
+- Update `#[Fillable]`: replace `category_id` with `brand_id`, add `unit_id`, add `type`
+- Casts: `type => ProductType`
+- Method `isInventory(): bool` — returns `true` when `type === ProductType::Inventory`
+- **Inventory operation guard:** `addStock`, `deductStock`, `adjustStock`, `adjustStockByReference`, `transferStock`, `reserve`, `releaseReservation`, `fulfillReservation` are overridden to throw `LogicException` if `!isInventory()`. Callers (order actions) **must** guard with `$product->isInventory()` before calling these methods, so non-inventory items are skipped cleanly.
 
 ### `Supplier` (update existing)
 - Add: `products()` belongsToMany Product (via `product_supplier`) `->withPivot(['unit_cost', 'supplier_sku'])`
@@ -201,6 +205,7 @@ Add `$navigationGroup = 'Catalog'`.
 | Change | Detail |
 |---|---|
 | Remove | `Select::make('category_id')` |
+| Add | `Select::make('type')->options(ProductType::class)->default(ProductType::Inventory)->required()` |
 | Add | `Select::make('categories')->multiple()->relationship('categories', 'name')->searchable()->preload()` |
 | Add | `Select::make('brand_id')->relationship('brand', 'name')->searchable()->nullable()` |
 | Add | `Select::make('unit_id')->relationship('unit', 'name')->searchable()->nullable()->helperText('Unit of measure, e.g. kg, piece')` |

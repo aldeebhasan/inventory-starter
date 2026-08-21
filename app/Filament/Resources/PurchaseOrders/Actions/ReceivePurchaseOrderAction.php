@@ -39,7 +39,9 @@ class ReceivePurchaseOrderAction extends Action
                                 createdBy: Auth::id(),
                             );
                             $convertedQty = $item->convertedQuantity();
-                            $item->product->addStock($convertedQty, $record->location_id, $dto);
+                            if ($item->product->isInventory()) {
+                                $item->product->addStock($convertedQty, $record->location_id, $dto);
+                            }
                             $item->update(['received_quantity' => $convertedQty]);
                         }
                     });

@@ -33,8 +33,10 @@ class ConfirmSaleOrderAction extends Action
                             reference: $item,
                             createdBy: Auth::id(),
                         );
-                        $reservation = $item->product->reserve($item->convertedQuantity(), $record->location_id, $dto);
-                        $item->update(['reservation_id' => $reservation->id]);
+                        if ($item->product->isInventory()) {
+                            $reservation = $item->product->reserve($item->convertedQuantity(), $record->location_id, $dto);
+                            $item->update(['reservation_id' => $reservation->id]);
+                        }
                     }
                     $record->update(['status' => SaleOrderStatus::Confirmed]);
                 });

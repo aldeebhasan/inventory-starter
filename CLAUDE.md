@@ -59,6 +59,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 4. **`App\Models\Location` extends the package model.** No migration needed — it wraps `inventorix_locations`.
 5. **Reservation lifecycle on Sale Orders.** `reservation_id` is stored on `sale_order_items`; never skip Confirm before Ship.
 6. **Resource structure:** `app/Filament/Resources/{PluralModel}/Pages|Schemas|Tables/` — form in `Schemas/`, table in `Tables/`, pages in `Pages/`.
+7. **Tests are part of building, not an afterthought.** Write and run tests for each unit of work before moving to the next. See Testing Requirements below.
 
 ### Doc Lookup (read only the file for the module you are working on)
 
@@ -82,17 +83,36 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Testing Requirements (MANDATORY)
 
-After implementing every feature — resource, workflow action, model, or migration — you MUST write Pest feature tests before considering the task complete. This is non-negotiable.
+Tests are written **as part of building**, not after. Every unit of work — model, migration, resource page, workflow action — must have its tests written and passing before moving on to the next unit. Do not batch all tests at the end.
 
-Tests must cover all main behaviors of the feature, including:
-- Rendering the list/create/edit/view pages
-- Creating, editing, and deleting records via the Filament UI
-- Workflow actions (confirm, receive, ship, cancel, etc.) and their side effects
-- Validation errors for required fields
-- Table filtering, searching, and soft-delete/restore where applicable
-- Stock operations (inventory changes, reservations, fulfillments)
+### Workflow for each unit of work
 
-After writing tests, run `php artisan test --compact` and fix all failures before finishing. All tests must pass.
+1. Implement the code (model, migration, resource page, action, etc.)
+2. Immediately write Pest feature tests for that unit
+3. Run `php artisan test --compact --filter=FeatureName` and fix all failures
+4. Only then move to the next unit
+
+### What tests to write per unit
+
+| Unit | Required tests |
+|---|---|
+| Model + migration | attribute fillable/cast, factory creates valid record, relationships resolve |
+| Resource list page | renders, lists records, search, filters, soft-delete/restore |
+| Resource create page | creates record, validates required fields, saves relationships |
+| Resource edit page | loads existing data, updates record, validates |
+| Resource view page | renders with correct data |
+| Workflow action | transitions status, side effects (stock ops, reservations), guard conditions |
+| Stock operation | inventory added/deducted/reserved/fulfilled, non-inventory products skipped |
+
+### Test file location
+
+`tests/Feature/{Group}/{Model}ResourceTest.php` — one file per resource, grouped by domain (Catalog, Purchase, Sales, Inventory).
+
+### Hard rules
+
+- **Never skip tests to save time.** A feature without passing tests is not done.
+- Run `php artisan test --compact` (full suite) before declaring any feature complete. All tests must pass — not just the new ones.
+- Do NOT delete tests without approval.
 
 ## Replies
 

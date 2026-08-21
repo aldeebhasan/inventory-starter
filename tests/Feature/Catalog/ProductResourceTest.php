@@ -1,10 +1,12 @@
 <?php
 
+use App\Enums\ProductType;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Location;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
@@ -122,4 +124,60 @@ it('can search products by name', function () {
         ->searchTable('UniqueProductName')
         ->assertCanSeeTableRecords([$product])
         ->assertCanNotSeeTableRecords([$other]);
+});
+
+it('defaults new products to inventory type', function () {
+    Livewire::test(CreateProduct::class)
+        ->fillForm(['name' => 'Default Type Product', 'price' => 10, 'cost' => 5])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertRedirect();
+
+    assertDatabaseHas(Product::class, ['name' => 'Default Type Product', 'type' => 'inventory']);
+});
+
+it('can create a non-inventory product', function () {
+    Livewire::test(CreateProduct::class)
+        ->fillForm(['name' => 'Service Product', 'price' => 10, 'cost' => 0, 'type' => ProductType::NonInventory])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertRedirect();
+
+    assertDatabaseHas(Product::class, ['name' => 'Service Product', 'type' => 'non_inventory']);
+});
+
+it('can filter products by type', function () {
+    $inventory = Product::factory()->create(['type' => ProductType::Inventory]);
+    $service = Product::factory()->nonInventory()->create();
+
+    Livewire::test(ListProducts::class)
+        ->filterTable('type', ProductType::Inventory->value)
+        ->assertCanSeeTableRecords([$inventory])
+        ->assertCanNotSeeTableRecords([$service]);
+});
+
+it('isInventory returns true for inventory products', function () {
+    $product = Product::factory()->create(['type' => ProductType::Inventory]);
+    expect($product->isInventory())->toBeTrue();
+});
+
+it('isInventory returns false for non-inventory products', function () {
+    $product = Product::factory()->nonInventory()->create();
+    expect($product->isInventory())->toBeFalse();
+});
+
+it('throws LogicException when calling addStock on a non-inventory product', function () {
+    $product = Product::factory()->nonInventory()->create();
+    $location = Location::create(['name' => 'WH', 'is_active' => true, 'meta' => ['type' => 'warehouse']]);
+
+    expect(fn () => $product->addStock(1, $location->id))
+        ->toThrow(LogicException::class);
+});
+
+it('throws LogicException when calling reserve on a non-inventory product', function () {
+    $product = Product::factory()->nonInventory()->create();
+    $location = Location::create(['name' => 'WH2', 'is_active' => true, 'meta' => ['type' => 'warehouse']]);
+
+    expect(fn () => $product->reserve(1, $location->id))
+        ->toThrow(LogicException::class);
 });
