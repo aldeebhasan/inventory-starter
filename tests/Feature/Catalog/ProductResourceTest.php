@@ -1,5 +1,6 @@
 <?php
 
+use Aldeebhasan\Inventorix\Models\Stock;
 use App\Enums\ProductType;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
@@ -166,18 +167,21 @@ it('isInventory returns false for non-inventory products', function () {
     expect($product->isInventory())->toBeFalse();
 });
 
-it('throws LogicException when calling addStock on a non-inventory product', function () {
+it('addStock on a non-inventory product is a no-op and does not add stock', function () {
     $product = Product::factory()->nonInventory()->create();
     $location = Location::create(['name' => 'WH', 'is_active' => true, 'meta' => ['type' => 'warehouse']]);
 
-    expect(fn () => $product->addStock(1, $location->id))
-        ->toThrow(LogicException::class);
+    $result = $product->addStock(1, $location->id);
+
+    expect($result)->toBeInstanceOf(Stock::class);
+    expect($product->stockAt($location->id))->toBeNull();
 });
 
-it('throws LogicException when calling reserve on a non-inventory product', function () {
+it('reserve on a non-inventory product is a no-op and returns null', function () {
     $product = Product::factory()->nonInventory()->create();
     $location = Location::create(['name' => 'WH2', 'is_active' => true, 'meta' => ['type' => 'warehouse']]);
 
-    expect(fn () => $product->reserve(1, $location->id))
-        ->toThrow(LogicException::class);
+    $result = $product->reserve(1, $location->id);
+
+    expect($result)->toBeNull();
 });
