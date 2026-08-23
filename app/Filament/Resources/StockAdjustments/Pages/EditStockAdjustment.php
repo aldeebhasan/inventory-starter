@@ -27,8 +27,12 @@ class EditStockAdjustment extends EditRecord
 
     protected function getHeaderActions(): array
     {
+        /** @var StockAdjustment $record */
+        $record = $this->record;
+
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible($record->status === StockAdjustmentStatus::Draft),
             ForceDeleteAction::make(),
             RestoreAction::make(),
         ];

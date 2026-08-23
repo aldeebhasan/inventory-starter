@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Resources\PurchaseOrders\Tables;
+namespace App\Filament\Resources\TransferOrders\Tables;
 
-use App\Enums\PurchaseOrderStatus;
-use App\Models\PurchaseOrder;
+use App\Enums\TransferOrderStatus;
+use App\Models\TransferOrder;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -16,7 +16,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
-class PurchaseOrdersTable
+class TransferOrdersTable
 {
     public static function configure(Table $table): Table
     {
@@ -25,32 +25,32 @@ class PurchaseOrdersTable
                 TextColumn::make('order_number')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('supplier.name')
-                    ->sortable(),
-                TextColumn::make('location.name'),
+                TextColumn::make('fromLocation.name')
+                    ->label('From'),
+                TextColumn::make('toLocation.name')
+                    ->label('To'),
                 TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(fn ($state): ?string => $state?->label())
                     ->color(fn ($state) => $state?->color()),
-                TextColumn::make('ordered_at')
-                    ->date()
-                    ->sortable(),
                 TextColumn::make('items_count')
                     ->counts('items')
                     ->label('Lines'),
+                TextColumn::make('created_at')
+                    ->date()
+                    ->sortable(),
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options(PurchaseOrderStatus::class),
-                SelectFilter::make('supplier_id')
-                    ->relationship('supplier', 'name'),
+                    ->options(TransferOrderStatus::class),
                 TrashedFilter::make(),
             ])
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()
-                    ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::Draft),
+                    ->visible(fn (TransferOrder $record) => $record->status === TransferOrderStatus::Draft),
                 DeleteAction::make()
-                    ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::Draft),
+                    ->visible(fn (TransferOrder $record) => $record->status === TransferOrderStatus::Draft),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

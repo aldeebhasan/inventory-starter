@@ -2,10 +2,6 @@
 
 namespace App\Models;
 
-use Aldeebhasan\Inventorix\DTOs\StockOperationDto;
-use Aldeebhasan\Inventorix\Models\Location;
-use Aldeebhasan\Inventorix\Models\Reservation;
-use Aldeebhasan\Inventorix\Models\Stock;
 use Aldeebhasan\Inventorix\Traits\HasInventory;
 use App\Enums\ProductType;
 use Database\Factories\ProductFactory;
@@ -16,7 +12,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use LogicException;
 
 /**
  * @property int $id
@@ -38,8 +33,7 @@ use LogicException;
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
-    use HasFactory, SoftDeletes, HasInventory;
-
+    use HasFactory, HasInventory, SoftDeletes;
 
     protected $casts = [
         'price' => 'float',

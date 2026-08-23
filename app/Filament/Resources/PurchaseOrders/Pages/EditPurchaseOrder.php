@@ -27,8 +27,12 @@ class EditPurchaseOrder extends EditRecord
 
     protected function getHeaderActions(): array
     {
+        /** @var PurchaseOrder $record */
+        $record = $this->record;
+
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible($record->status === PurchaseOrderStatus::Draft),
             ForceDeleteAction::make(),
             RestoreAction::make(),
         ];

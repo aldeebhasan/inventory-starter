@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\SaleOrders\Tables;
 
 use App\Enums\SaleOrderStatus;
+use App\Models\SaleOrder;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -46,8 +47,10 @@ class SaleOrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->visible(fn (SaleOrder $record) => $record->status === SaleOrderStatus::Draft),
+                DeleteAction::make()
+                    ->visible(fn (SaleOrder $record) => $record->status === SaleOrderStatus::Draft),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

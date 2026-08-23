@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\StockAdjustments\Tables;
 
 use App\Enums\StockAdjustmentStatus;
+use App\Models\StockAdjustment;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -45,8 +46,10 @@ class StockAdjustmentsTable
             ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->visible(fn (StockAdjustment $record) => $record->status === StockAdjustmentStatus::Draft),
+                DeleteAction::make()
+                    ->visible(fn (StockAdjustment $record) => $record->status === StockAdjustmentStatus::Draft),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

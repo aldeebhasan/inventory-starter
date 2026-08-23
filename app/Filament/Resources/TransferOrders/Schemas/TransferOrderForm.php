@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\StockAdjustments\Schemas;
+namespace App\Filament\Resources\TransferOrders\Schemas;
 
 use App\Enums\ProductType;
-use App\Enums\StockAdjustmentOperation;
 use App\Models\Location;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -12,7 +11,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 
-class StockAdjustmentForm
+class TransferOrderForm
 {
     public static function configure(Schema $schema): Schema
     {
@@ -22,33 +21,33 @@ class StockAdjustmentForm
                     ->unique(ignoreRecord: true)
                     ->disabled()
                     ->dehydrated(),
-                Select::make('location_id')
-                    ->label('Warehouse')
+                Select::make('from_location_id')
+                    ->label('From Location')
                     ->options(fn () => Location::all()->pluck('name', 'id'))
                     ->searchable()
                     ->required(),
-                TextInput::make('reason')
-                    ->required(),
+                Select::make('to_location_id')
+                    ->label('To Location')
+                    ->options(fn () => Location::all()->pluck('name', 'id'))
+                    ->searchable()
+                    ->required()
+                    ->different('from_location_id'),
                 Textarea::make('notes')
                     ->nullable(),
                 Repeater::make('items')
                     ->relationship()
                     ->defaultItems(0)
                     ->schema([
-                        Grid::make(4)->schema([
+                        Grid::make(3)->schema([
                             Select::make('product_id')
                                 ->relationship('product', 'name', fn ($query) => $query->where('type', ProductType::Inventory))
                                 ->searchable()
                                 ->required()
                                 ->columnSpan(2),
-                            Select::make('operation')
-                                ->options(StockAdjustmentOperation::class)
-                                ->required()
-                                ->columnSpan(1),
                             TextInput::make('quantity')
                                 ->numeric()
-                                ->minValue(0.0001)
                                 ->required()
+                                ->minValue(0.001)
                                 ->columnSpan(1),
                         ]),
                     ])
