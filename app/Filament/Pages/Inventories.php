@@ -83,7 +83,7 @@ class Inventories extends Page implements HasTable
                 TextColumn::make('threshold_min')
                     ->label('Min Threshold')
                     ->state(function (Stock $record): string {
-                        $threshold = Threshold::where('stockable_type', Product::class)
+                        $threshold = Threshold::query()->where('stockable_type', Product::class)
                             ->where('stockable_id', $record->stockable_id)
                             ->where('location_id', $record->location_id)
                             ->first();
@@ -94,7 +94,7 @@ class Inventories extends Page implements HasTable
                 TextColumn::make('threshold_max')
                     ->label('Max Threshold')
                     ->state(function (Stock $record): string {
-                        $threshold = Threshold::where('stockable_type', Product::class)
+                        $threshold = Threshold::query()->where('stockable_type', Product::class)
                             ->where('stockable_id', $record->stockable_id)
                             ->where('location_id', $record->location_id)
                             ->first();
@@ -106,7 +106,7 @@ class Inventories extends Page implements HasTable
                     ->label('Status')
                     ->badge()
                     ->state(function (Stock $record): string {
-                        $threshold = Threshold::where('stockable_type', Product::class)
+                        $threshold = Threshold::query()->where('stockable_type', Product::class)
                             ->where('stockable_id', $record->stockable_id)
                             ->where('location_id', $record->location_id)
                             ->first();
@@ -120,7 +120,7 @@ class Inventories extends Page implements HasTable
                         return $available <= $threshold->min_quantity ? 'Low Stock' : 'OK';
                     })
                     ->color(function (Stock $record): string {
-                        $threshold = Threshold::where('stockable_type', Product::class)
+                        $threshold = Threshold::query()->where('stockable_type', Product::class)
                             ->where('stockable_id', $record->stockable_id)
                             ->where('location_id', $record->location_id)
                             ->first();
@@ -137,7 +137,7 @@ class Inventories extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->active()->pluck('name', 'id'))
+                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
                     ->searchable(),
 
                 SelectFilter::make('stockable_id')
@@ -158,7 +158,7 @@ class Inventories extends Page implements HasTable
                     ->label('Set Threshold')
                     ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
                     ->fillForm(function (Stock $record): array {
-                        $threshold = Threshold::where('stockable_type', Product::class)
+                        $threshold = Threshold::query()->where('stockable_type', Product::class)
                             ->where('stockable_id', $record->stockable_id)
                             ->where('location_id', $record->location_id)
                             ->first();
@@ -182,15 +182,21 @@ class Inventories extends Page implements HasTable
                             ->nullable(),
                     ])
                     ->action(function (Stock $record, array $data): void {
-                        /** @var Product $product */
-                        $product = $record->stockable;
-                        $product->setStockThreshold(
-                            min: (float) $data['min_quantity'],
-                            max: isset($data['max_quantity']) && $data['max_quantity'] !== null && $data['max_quantity'] !== '' ? (float) $data['max_quantity'] : null,
-                            location: $record->location_id,
-                        );
+                        $product = $record->stockable()->first();
+
+                        if ($product instanceof Product) {
+                            $product->setStockThreshold(
+                                min: (float) $data['min_quantity'],
+                                max: filled($data['max_quantity'] ?? null) ? (float) $data['max_quantity'] : null,
+                                location: $record->location_id,
+                            );
+                        }
                     })
-                    ->modalHeading(fn (Stock $record) => 'Set Threshold — '.$record->stockable?->name)
+                    ->modalHeading(function (Stock $record): string {
+                        $product = $record->stockable()->first();
+
+                        return 'Set Threshold — '.($product instanceof Product ? $product->name : '');
+                    })
                     ->modalSubmitActionLabel('Save Threshold'),
             ])
             ->defaultSort('stockable_id');

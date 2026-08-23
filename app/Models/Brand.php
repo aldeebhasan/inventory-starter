@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string|null $logo
+ * @property bool $is_active
+ */
 #[Fillable(['name', 'logo', 'is_active'])]
 class Brand extends Model
 {

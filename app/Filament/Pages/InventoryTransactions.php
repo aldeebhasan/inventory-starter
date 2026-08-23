@@ -125,7 +125,7 @@ class InventoryTransactions extends Page implements HasTable
 
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->active()->pluck('name', 'id'))
+                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
                     ->searchable(),
 
                 SelectFilter::make('type')

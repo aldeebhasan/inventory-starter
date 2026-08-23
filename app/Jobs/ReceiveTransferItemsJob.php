@@ -24,7 +24,8 @@ class ReceiveTransferItemsJob implements ShouldQueue
 
     public function handle(): void
     {
-        $items = $this->order->items()
+        $items = TransferOrderItem::query()
+            ->where('transfer_order_id', $this->order->id)
             ->where('item_status', TransferOrderItemStatus::Sent)
             ->get();
 
@@ -40,7 +41,7 @@ class ReceiveTransferItemsJob implements ShouldQueue
         $item->update(['item_status' => TransferOrderItemStatus::Receiving]);
 
         try {
-            $transaction = Transaction::where('causable_type', TransferOrderItem::class)
+            $transaction = Transaction::query()->where('causable_type', TransferOrderItem::class)
                 ->where('causable_id', $item->id)
                 ->where('type', TransactionType::Transfer)
                 ->firstOrFail();

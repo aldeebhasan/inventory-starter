@@ -23,7 +23,8 @@ class SendTransferItemsJob implements ShouldQueue
 
     public function handle(): void
     {
-        $items = $this->order->items()
+        $items = TransferOrderItem::query()
+            ->where('transfer_order_id', $this->order->id)
             ->where('item_status', TransferOrderItemStatus::Pending)
             ->get();
 

@@ -26,7 +26,7 @@ class ConfirmTransferOrderAction extends Action
                 $errors = [];
 
                 foreach ($record->items as $item) {
-                    $stock = $item->product->stockAt($record->from_location_id)?->quantity ?? 0;
+                    $stock = $item->product->stockAt($record->from_location_id)->quantity ?? 0;
                     if ($stock < $item->quantity) {
                         $errors[] = "{$item->product->name}: insufficient stock ({$stock} available, {$item->quantity} requested)";
                     }

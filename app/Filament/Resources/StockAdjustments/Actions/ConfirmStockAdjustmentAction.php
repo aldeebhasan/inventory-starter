@@ -28,7 +28,7 @@ class ConfirmStockAdjustmentAction extends Action
                 $errors = [];
 
                 foreach ($record->items as $item) {
-                    $stock = $item->product->stockAt($record->location_id)?->quantity ?? 0;
+                    $stock = $item->product->stockAt($record->location_id)->quantity ?? 0;
                     $item->update(['current_stock' => $stock]);
 
                     $valid = match ($item->operation) {
@@ -43,13 +43,6 @@ class ConfirmStockAdjustmentAction extends Action
                 }
 
                 if (! empty($errors)) {
-                    return;
-                }
-
-                $record->update(['status' => StockAdjustmentStatus::Processing]);
-                $record->items()->update(['item_status' => StockAdjustmentItemStatus::Pending]);
-
-                if (! empty($errors)) {
                     Notification::make()
                         ->danger()
                         ->title('Cannot confirm — validation failed')
@@ -60,6 +53,9 @@ class ConfirmStockAdjustmentAction extends Action
 
                     return;
                 }
+
+                $record->update(['status' => StockAdjustmentStatus::Processing]);
+                $record->items()->update(['item_status' => StockAdjustmentItemStatus::Pending]);
 
                 ApplyStockAdjustmentJob::dispatch($record->fresh())->onQueue('inventory');
 

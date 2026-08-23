@@ -6,6 +6,7 @@ use App\Enums\StockAdjustmentItemStatus;
 use App\Enums\StockAdjustmentStatus;
 use Database\Factories\StockAdjustmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,9 +60,11 @@ class StockAdjustment extends Model
         return $this->hasMany(StockAdjustmentItem::class);
     }
 
-    public function failedItems(): HasMany
+    /** @return Builder<StockAdjustmentItem> */
+    public function failedItems(): Builder
     {
-        return $this->hasMany(StockAdjustmentItem::class)
+        return StockAdjustmentItem::query()
+            ->where('stock_adjustment_id', $this->id)
             ->where('item_status', StockAdjustmentItemStatus::Failed);
     }
 

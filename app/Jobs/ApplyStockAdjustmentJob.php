@@ -24,7 +24,8 @@ class ApplyStockAdjustmentJob implements ShouldQueue
 
     public function handle(): void
     {
-        $items = $this->order->items()
+        $items = StockAdjustmentItem::query()
+            ->where('stock_adjustment_id', $this->order->id)
             ->where('item_status', StockAdjustmentItemStatus::Pending)
             ->get();
 

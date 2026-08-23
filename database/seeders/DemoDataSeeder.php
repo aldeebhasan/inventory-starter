@@ -24,13 +24,14 @@ class DemoDataSeeder extends Seeder
             ['name' => 'LG', 'is_active' => true],
             ['name' => 'Dell', 'is_active' => true],
             ['name' => 'HP', 'is_active' => false],
-        ])->map(fn (array $data) => Brand::factory()->create($data));
+        ])->map(fn (array $data) => Brand::factory()->createOne($data));
 
         // Categories
-        $categories = collect([
-            'Electronics', 'Accessories', 'Computers', 'Mobile Phones',
-            'Audio', 'Home Appliances', 'Office Supplies',
-        ])->map(fn (string $name) => Category::create(['name' => $name]));
+        $categoryNames = ['Electronics', 'Accessories', 'Computers', 'Mobile Phones', 'Audio', 'Home Appliances', 'Office Supplies'];
+        $categoryIds = [];
+        foreach ($categoryNames as $name) {
+            $categoryIds[] = Category::query()->create(['name' => $name])->getKey();
+        }
 
         // Units (base + derived)
         $piece = Unit::factory()->create(['name' => 'Piece', 'abbreviation' => 'pc']);
@@ -67,7 +68,7 @@ class DemoDataSeeder extends Seeder
             ['name' => 'Downtown Store', 'code' => 'ST-001', 'is_active' => true, 'meta' => ['type' => LocationType::Store->value]],
             ['name' => 'Mall Store', 'code' => 'ST-002', 'is_active' => true, 'meta' => ['type' => LocationType::Store->value]],
             ['name' => 'Transit Hub', 'code' => 'TR-001', 'is_active' => true, 'meta' => ['type' => LocationType::Transit->value]],
-        ])->map(fn (array $data) => Location::create($data));
+        ])->map(fn (array $data) => Location::query()->create($data));
 
         // Products (inventory)
         $inventoryProducts = collect([
@@ -81,18 +82,18 @@ class DemoDataSeeder extends Seeder
             ['name' => 'USB-C Cable Pack', 'price' => 19.99, 'cost' => 5.00, 'brand' => null, 'unit' => $box, 'cats' => [1, 6]],
             ['name' => 'Wireless Mouse', 'price' => 29.99, 'cost' => 12.00, 'brand' => 4, 'unit' => $piece, 'cats' => [1, 6]],
             ['name' => 'Mechanical Keyboard', 'price' => 129.99, 'cost' => 65.00, 'brand' => null, 'unit' => $piece, 'cats' => [1, 6]],
-        ])->map(function (array $data) use ($brands, $categories, $addons) {
+        ])->map(function (array $data) use ($brands, $categoryIds, $addons) {
             $product = Product::factory()->create([
                 'name' => $data['name'],
                 'price' => $data['price'],
                 'cost' => $data['cost'],
                 'type' => ProductType::Inventory,
-                'brand_id' => $data['brand'] !== null ? $brands[$data['brand']]->id : null,
+                'brand_id' => $data['brand'] !== null ? $brands->get($data['brand'])?->id : null,
                 'unit_id' => $data['unit']->id,
             ]);
 
             $product->categories()->attach(
-                collect($data['cats'])->map(fn (int $i) => $categories[$i]->id)
+                collect($data['cats'])->map(fn (int $i) => $categoryIds[$i])
             );
 
             // Attach 1-2 random addons to each product
@@ -107,14 +108,14 @@ class DemoDataSeeder extends Seeder
         collect([
             ['name' => 'Software License', 'price' => 199.99, 'cost' => 0],
             ['name' => 'Consultation Service', 'price' => 150.00, 'cost' => 0],
-        ])->each(function (array $data) use ($piece, $categories) {
+        ])->each(function (array $data) use ($piece, $categoryIds) {
             $product = Product::factory()->nonInventory()->create([
                 'name' => $data['name'],
                 'price' => $data['price'],
                 'cost' => $data['cost'],
                 'unit_id' => $piece->id,
             ]);
-            $product->categories()->attach($categories[6]->id);
+            $product->categories()->attach($categoryIds[6]);
         });
 
         $this->command->info('Seeded: 6 brands, 7 categories, 6 units, 6 addons, 5 locations, 12 products');
