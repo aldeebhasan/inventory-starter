@@ -158,3 +158,11 @@ span.fi-breadcrumbs-item-label {
 .fi-dropdown-list-item-label {
     @apply text-sm;
 }
+
+/* ─── Login / Simple pages background ────────────────────── */
+.fi-simple-layout {
+    background-image: url('/images/login-bg.webp');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
