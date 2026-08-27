@@ -57,7 +57,8 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 2. **`Inventorix::bulk()` for all multi-item operations.** Wrap per-line inventory calls in a bulk transaction for atomic rollback.
 3. **Workflow actions on View pages only.** Status transitions (Confirm, Receive, Ship, etc.) are header actions on `ViewXxx` — never inline table actions.
 4. **`App\Models\Location` extends the package model.** No migration needed — it wraps `inventorix_locations`.
-5. **Reservation lifecycle on Sale Orders.** `reservation_id` is stored on `sale_order_items`; never skip Confirm before Ship.
+5. **Reservation lifecycle on Sale Orders.** `reservation_id` is stored on `sale_order_items`; never skip Confirm before Dispatch.
+8. **Status tracking.** All order models use `TracksStatus` trait. Every status change is logged to `status_logs` table. See `docs/status-tracking.md`.
 6. **Resource structure:** `app/Filament/Resources/{PluralModel}/Pages|Schemas|Tables/` — form in `Schemas/`, table in `Tables/`, pages in `Pages/`.
 7. **Tests are part of building, not an afterthought.** Write and run tests for each unit of work before moving to the next. See Testing Requirements below.
 
@@ -77,6 +78,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 | Movement History page                       | `docs/inventory/movement-history.md` |
 | Low Stock Alerts page                       | `docs/inventory/low-stock-alerts.md` |
 | Dashboard widgets                           | `docs/dashboard/widgets.md` |
+| Status tracking (global)                    | `docs/status-tracking.md` |
 
 **Rules:**
 - Do not read doc files for modules unrelated to the current task.

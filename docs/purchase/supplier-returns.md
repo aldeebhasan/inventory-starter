@@ -3,7 +3,8 @@
 **Navigation Group:** Purchase
 **Purpose:** Warehouse sends goods back to a supplier → stock is deducted via `deductStock()`.
 **References:** Purchase Orders via `originalOrder()` morphTo.
-**Shared model:** `ReturnOrder` with `type = supplier_return` — scoped at the resource level.
+**Shared model:** `ReturnOrder` with `type = supplier_return` -- scoped at the resource level.
+**Status Tracking:** Uses `TracksStatus` trait on `ReturnOrder` -- see `docs/status-tracking.md`.
 
 **Do not:** Mix with Customer Returns. Supplier returns remove stock (reversing a purchase). Using the wrong type silently corrupts stock levels.
 

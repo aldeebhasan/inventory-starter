@@ -3,6 +3,8 @@
 **Navigation Group:** Inventory
 **Purpose:** Manually correct stock levels for one or more products at a given location. Each line specifies an operation type — increase, decrease, or set. The order is processed asynchronously via a job batch so large documents don't block the UI. Each line tracks its own processing status, and failed lines can be retried without re-processing successful ones.
 
+**Status Tracking:** Uses `TracksStatus` trait -- see `docs/status-tracking.md`.
+
 **Do not:** Call `$product->addStock()`, `$product->deductStock()`, or `$product->adjustStock()` directly for manual corrections. All manual stock changes must go through a StockAdjustment → Confirm workflow so the correction is documented with a reason and linked to an auditable document.
 
 ## State Machine
@@ -70,7 +72,7 @@ enum StockAdjustmentItemStatus: string
 
 ## Models
 
-- `StockAdjustment` — `HasFactory`, `SoftDeletes`; casts: `status => StockAdjustmentStatus`; relationships: `location()`, `items()`, `pendingItems()` (hasMany filtered by Pending), `failedItems()` (hasMany filtered by Failed), `createdBy()`
+- `StockAdjustment` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => StockAdjustmentStatus`; relationships: `location()`, `items()`, `pendingItems()` (hasMany filtered by Pending), `failedItems()` (hasMany filtered by Failed), `createdBy()`
 - `StockAdjustmentItem` — relationships: `stockAdjustment()`, `product()`; casts: `operation => StockAdjustmentOperation`, `item_status => StockAdjustmentItemStatus`
 
 ### Model Methods on `StockAdjustment`

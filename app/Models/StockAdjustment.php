@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\TracksStatus;
 use App\Enums\StockAdjustmentItemStatus;
 use App\Enums\StockAdjustmentStatus;
 use Database\Factories\StockAdjustmentFactory;
@@ -30,7 +31,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class StockAdjustment extends Model
 {
     /** @use HasFactory<StockAdjustmentFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksStatus;
 
     protected $casts = [
         'status' => StockAdjustmentStatus::class,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\TracksStatus;
 use App\Enums\TransferOrderItemStatus;
 use App\Enums\TransferOrderStatus;
 use Database\Factories\TransferOrderFactory;
@@ -30,7 +31,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class TransferOrder extends Model
 {
     /** @use HasFactory<TransferOrderFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksStatus;
 
     protected $casts = [
         'status' => TransferOrderStatus::class,

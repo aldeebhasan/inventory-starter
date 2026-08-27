@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\TracksStatus;
 use App\Enums\SaleOrderStatus;
 use Carbon\Carbon;
 use Database\Factories\SaleOrderFactory;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class SaleOrder extends Model
 {
     /** @use HasFactory<SaleOrderFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksStatus;
 
     protected $casts = [
         'status' => SaleOrderStatus::class,

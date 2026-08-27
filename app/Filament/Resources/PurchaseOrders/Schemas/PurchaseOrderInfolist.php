@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\TransferOrders\Schemas;
+namespace App\Filament\Resources\PurchaseOrders\Schemas;
 
 use App\Filament\Schemas\StatusHistorySection;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -9,7 +9,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
-class TransferOrderInfolist
+class PurchaseOrderInfolist
 {
     public static function configure(Schema $schema): Schema
     {
@@ -24,44 +24,42 @@ class TransferOrderInfolist
                                 ->badge()
                                 ->color(fn ($state) => $state?->color())
                                 ->columnSpan(1),
-                            TextEntry::make('created_at')
+                            TextEntry::make('ordered_at')
                                 ->dateTime()
                                 ->columnSpan(1),
-                            TextEntry::make('fromLocation.name')
-                                ->label('From Location')
+                            TextEntry::make('supplier.name')
                                 ->columnSpan(1),
-                            TextEntry::make('toLocation.name')
-                                ->label('To Location')
+                            TextEntry::make('location.name')
+                                ->label('Warehouse')
                                 ->columnSpan(1),
                             TextEntry::make('createdBy.name')
                                 ->label('Created By')
-                                ->placeholder('—')
+                                ->placeholder('-')
                                 ->columnSpan(1),
                             TextEntry::make('notes')
                                 ->columnSpanFull()
-                                ->placeholder('—'),
+                                ->placeholder('-'),
                         ]),
                     ])->columnSpanFull(),
                 Section::make('Lines')
                     ->schema([
                         RepeatableEntry::make('items')
+                            ->label('')
                             ->schema([
                                 Grid::make(5)->schema([
                                     TextEntry::make('product.name')
                                         ->label('Product')
                                         ->columnSpan(2),
+                                    TextEntry::make('unit.name')
+                                        ->label('Unit')
+                                        ->placeholder('-')
+                                        ->columnSpan(1),
                                     TextEntry::make('quantity')
                                         ->columnSpan(1),
-                                    TextEntry::make('item_status')
-                                        ->label('Status')
-                                        ->badge()
-                                        ->color(fn ($state) => $state?->color())
+                                    TextEntry::make('unit_cost')
+                                        ->label('Unit Cost')
+                                        ->placeholder('-')
                                         ->columnSpan(1),
-                                    TextEntry::make('failure_reason')
-                                        ->label('Failure Reason')
-                                        ->placeholder('—')
-                                        ->columnSpan(1)
-                                        ->visible(fn ($state) => filled($state)),
                                 ]),
                             ])
                             ->columnSpanFull(),

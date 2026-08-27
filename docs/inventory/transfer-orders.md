@@ -3,6 +3,8 @@
 **Navigation Group:** Inventory
 **Purpose:** Move stock between two warehouse locations with full send/receive lifecycle tracking.
 
+**Status Tracking:** Uses `TracksStatus` trait -- see `docs/status-tracking.md`.
+
 **Do not:** Call `$product->transferStock()` directly. All location-to-location moves must go through a TransferOrder workflow so the movement is auditable, linked to a document, and supports in-transit tracking.
 
 ## State Machine
@@ -49,7 +51,7 @@ Values: `pending`, `sending`, `sent`, `receiving`, `received`, `failed`
 
 ## Models
 
-- `TransferOrder` — `HasFactory`, `SoftDeletes`; casts: `status => TransferOrderStatus`; relationships: `fromLocation()` (FK: from_location_id), `toLocation()` (FK: to_location_id), `items()`, `pendingItems()`, `failedItems()`, `sentItems()`, `createdBy()`
+- `TransferOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => TransferOrderStatus`; relationships: `fromLocation()` (FK: from_location_id), `toLocation()` (FK: to_location_id), `items()`, `pendingItems()`, `failedItems()`, `sentItems()`, `createdBy()`
 - `TransferOrderItem` — relationships: `transferOrder()`, `product()`; casts: `item_status => TransferOrderItemStatus`; columns include `failure_reason` (nullable text)
 
 ### Model Method: `syncStatusFromItems(string $phase): void`

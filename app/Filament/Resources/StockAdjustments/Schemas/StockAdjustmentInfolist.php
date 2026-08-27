@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockAdjustments\Schemas;
 
+use App\Filament\Schemas\StatusHistorySection;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -68,6 +69,7 @@ class StockAdjustmentInfolist
                             ])
                             ->columnSpanFull(),
                     ])->columnSpanFull(),
+                StatusHistorySection::make(),
             ]);
     }
 }

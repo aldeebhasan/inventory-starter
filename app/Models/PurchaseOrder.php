@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\TracksStatus;
 use App\Enums\PurchaseOrderStatus;
 use Carbon\Carbon;
 use Database\Factories\PurchaseOrderFactory;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class PurchaseOrder extends Model
 {
     /** @use HasFactory<PurchaseOrderFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksStatus;
 
     protected $casts = [
         'status' => PurchaseOrderStatus::class,

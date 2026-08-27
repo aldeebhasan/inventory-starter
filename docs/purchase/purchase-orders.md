@@ -2,7 +2,8 @@
 
 **Navigation Group:** Purchase
 **Purpose:** Receive goods from suppliers into a warehouse location.
-**Referenced by:** Supplier Returns — a supplier return can reference a PO as its `originalOrder`.
+**Referenced by:** Supplier Returns -- a supplier return can reference a PO as its `originalOrder`.
+**Status Tracking:** Uses `TracksStatus` trait -- see `docs/status-tracking.md`.
 
 **Do not:** Call `$product->addStock()` directly for a stock receipt. All stock additions from purchasing must go through a PurchaseOrder → Receive workflow so the movement is linked to the PO as `causable`.
 
@@ -15,7 +16,7 @@ Draft ──[Confirm]──> Confirmed ──[Receive]──> Received
 
 ## Models
 
-- `PurchaseOrder` — `HasFactory`, `SoftDeletes`; casts: `status => PurchaseOrderStatus`, `ordered_at`, `received_at` as datetime; relationships: `supplier()`, `location()`, `items()`, `createdBy()`, `supplierReturns()` morphMany ReturnOrder
+- `PurchaseOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => PurchaseOrderStatus`, `ordered_at`, `received_at` as datetime; relationships: `supplier()`, `location()`, `items()`, `createdBy()`, `supplierReturns()` morphMany ReturnOrder
 - `PurchaseOrderItem` — `#[Fillable([..., 'unit_id', ...])]`; relationships: `purchaseOrder()`, `product()`, `unit()` belongsTo Unit; method: `convertedQuantity(): float` — returns `quantity` converted to the product's base unit via `unit->convertQty()`
 
 ## Filament Resource
