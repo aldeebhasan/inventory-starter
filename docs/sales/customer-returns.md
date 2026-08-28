@@ -6,13 +6,34 @@
 **Shared model:** `ReturnOrder` with `type = customer_return` -- scoped at the resource level.
 **Status Tracking:** Uses `TracksStatus` trait on `ReturnOrder` -- see `docs/status-tracking.md`.
 
+## Creation Modes
+
+A customer return can be started in two ways:
+
+1. **From a Sale Order** -- initiated from a specific sale order. Items are limited to the products in that sale order. The item price defaults to the sale order item's unit price. When stock is added back, the cost used is the sale order item's unit cost.
+2. **On the fly** -- created independently without a sale order. Any product can be added. The item price defaults to the product's current price. When stock is added back, the cost used is the product's cost.
+
+### Item Fields
+
+| Field | Type | Notes |
+|---|---|---|
+| product_id | Select | required. If linked to a sale order, limited to that order's products |
+| quantity | Numeric | required |
+| price | Numeric | the return price per unit. Defaults to sale order item price (if from order) or product price (if on the fly) |
+
+### Inventory Cost on Completion
+
+When the return is completed and stock is added back:
+- **From Sale Order:** the `cost` passed to `addStock()` is the sale order item's `unit_cost`.
+- **On the fly:** the `cost` passed to `addStock()` is the product's cost (fallback).
+
 ## State Machine
 
 ```
-Draft ──[Complete]──> Completed ──[Cancel]──> Cancelled
-  └──[Cancel]──> Cancelled
+Draft --[Complete]--> Completed --[Cancel]--> Cancelled
+  └──[Cancel]--> Cancelled
 
-Complete: addStock() per item (TransactionType::Sale)
+Complete: addStock() per item (TransactionType::Sale), cost = sale order item cost or product cost
 Cancel from Completed: deductStock() per item (TransactionType::Reversal) -- reverses the stock addition
 Cancel from Draft: no inventory reversal needed
 ```
@@ -49,11 +70,11 @@ protected function mutateFormDataBeforeCreate(array $data): array
 |---|---|---|
 | order_number | TextInput | auto-generated CRT-XXXXX, unique |
 | customer_id | Select | relationship('customer', 'name'), searchable, required |
-| original_order_id | Select | from SaleOrders, nullable, label 'Original Sale Order' |
+| original_order_id | Select | from SaleOrders, nullable, label 'Original Sale Order'. When changed, resets items |
 | location_id | Select | relationship('location', 'name'), required |
 | reason | TextInput | required |
 | notes | Textarea | nullable |
-| items | Repeater | relationship() -- product_id (span 2), quantity (span 1), unit_cost nullable (span 1) |
+| items | Repeater | relationship() -- product_id (span 2, options filtered by sale order if linked), quantity (span 1), price (span 1, defaults per creation mode) |
 
 ### Table (`Tables/CustomerReturnsTable.php`)
 
@@ -79,12 +100,15 @@ Action::make('complete')
         DB::transaction(function () use ($record) {
             Inventorix::bulk(function (Transaction $tx) use ($record) {
                 foreach ($record->items as $item) {
+                    // Use sale order item cost if available, otherwise product cost
+                    $cost = $item->saleOrderItem?->unit_cost ?? $item->product->cost;
+
                     $dto = new StockOperationDto(
                         transaction: $tx,
                         transactionType: TransactionType::Sale,
                         causable: $record,
                         reference: $item,
-                        cost: $item->unit_cost,
+                        cost: $cost,
                         createdBy: auth()->id(),
                     );
                     $item->product->addStock($item->quantity, $record->location_id, $dto);

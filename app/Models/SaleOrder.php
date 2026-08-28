@@ -45,7 +45,9 @@ class SaleOrder extends Model
         parent::boot();
 
         static::creating(function (SaleOrder $model) {
-            $model->order_number = 'SO-'.str_pad((string) ((int) static::query()->max('id') + 1), 5, '0', STR_PAD_LEFT);
+            $last = static::withTrashed()->max('order_number');
+            $next = $last ? ((int) str_replace('SO-', '', $last)) + 1 : 1;
+            $model->order_number = 'SO-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
         });
     }
 

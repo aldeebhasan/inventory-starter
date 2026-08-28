@@ -31,6 +31,7 @@ class ConfirmSaleOrderAction extends Action
                             transactionType: TransactionType::Sale,
                             causable: $record,
                             reference: $item,
+                            cost: $item->product->cost,
                             createdBy: Auth::id(),
                         );
                         if ($item->product->isInventory()) {

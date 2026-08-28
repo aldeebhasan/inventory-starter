@@ -48,11 +48,15 @@ it('auto-generates order number on creation', function () {
 });
 
 it('can create a sale order', function () {
+    $product = Product::factory()->create();
+
     Livewire::test(CreateSaleOrder::class)
         ->fillForm([
             'customer_id' => $this->customer->id,
             'location_id' => $this->location->id,
             'ordered_at' => now()->toDateTimeString(),
+            'items.0.product_id' => $product->id,
+            'items.0.quantity' => 5,
         ])
         ->call('create')
         ->assertHasNoFormErrors()
@@ -147,6 +151,38 @@ it('can ship a picked sale order and fulfills reservations', function () {
     $order->refresh();
     expect($order->status)->toBe(SaleOrderStatus::Shipped);
     expect($order->shipped_at)->not->toBeNull();
+});
+
+it('can fulfill a shipped sale order', function () {
+    $order = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->callAction('fulfill');
+
+    expect($order->fresh()->status)->toBe(SaleOrderStatus::Fulfilled);
+});
+
+it('fulfill action is hidden on non-shipped orders', function () {
+    $order = SaleOrder::factory()->confirmed()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->assertActionHidden('fulfill');
+});
+
+it('cancel is not available on fulfilled orders', function () {
+    $order = SaleOrder::factory()->fulfilled()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->assertActionHidden('cancel');
 });
 
 it('can cancel a draft sale order', function () {

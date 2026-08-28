@@ -63,10 +63,15 @@ it('auto-generates order number on creation', function () {
 });
 
 it('can create a stock adjustment', function () {
+    $product = Product::factory()->create();
+
     Livewire::test(CreateStockAdjustment::class)
         ->fillForm([
             'location_id' => $this->location->id,
             'reason' => 'Annual stock count',
+            'items.0.product_id' => $product->id,
+            'items.0.operation' => StockAdjustmentOperation::Increase->value,
+            'items.0.quantity' => 10,
         ])
         ->call('create')
         ->assertHasNoFormErrors()

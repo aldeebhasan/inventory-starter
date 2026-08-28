@@ -50,6 +50,7 @@ class ReceiveTransferItemsJob implements ShouldQueue
                 transactionType: TransactionType::Transfer,
                 causable: $item,
                 reference: $this->order,
+                cost: $item->product->cost,
                 note: "TO #{$this->order->order_number}: receive at {$this->order->toLocation->name}",
                 createdBy: $this->order->created_by,
             );

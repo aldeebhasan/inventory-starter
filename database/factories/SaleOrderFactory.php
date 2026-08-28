@@ -45,6 +45,11 @@ class SaleOrderFactory extends Factory
         return $this->state(['status' => SaleOrderStatus::Shipped, 'shipped_at' => now()]);
     }
 
+    public function fulfilled(): static
+    {
+        return $this->state(['status' => SaleOrderStatus::Fulfilled, 'shipped_at' => now()]);
+    }
+
     public function cancelled(): static
     {
         return $this->state(['status' => SaleOrderStatus::Cancelled]);

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\SaleOrders\Actions;
 
 use App\Enums\SaleOrderStatus;
+use App\Filament\Resources\RefundedOrders\RefundedOrderResource;
 use App\Models\SaleOrder;
 use Filament\Actions\Action;
 use Filament\Support\Icons\Heroicon;
@@ -19,9 +20,15 @@ class CreateSaleReturnAction extends Action
         parent::setUp();
 
         $this
-            ->label('Create Return')
+            ->label('Create Refund')
             ->icon(Heroicon::OutlinedArrowUturnLeft)
-            ->visible(fn (SaleOrder $record) => $record->status === SaleOrderStatus::Shipped)
-            ->disabled(); // CustomerReturnResource not yet implemented
+            ->visible(fn (SaleOrder $record) => in_array($record->status, [
+                SaleOrderStatus::Shipped,
+                SaleOrderStatus::Fulfilled,
+            ]))
+            ->url(fn (SaleOrder $record) => RefundedOrderResource::getUrl('create', [
+                'original_order_id' => $record->id,
+                'customer_id' => $record->customer_id,
+            ]));
     }
 }

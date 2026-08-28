@@ -43,10 +43,9 @@ class TransferOrder extends Model
 
         static::creating(function (TransferOrder $model) {
             if (empty($model->order_number)) {
-                $model->order_number = 'TO-'.str_pad(
-                    (string) ((int) static::withTrashed()->max('id') + 1),
-                    5, '0', STR_PAD_LEFT
-                );
+                $last = static::withTrashed()->max('order_number');
+                $next = $last ? ((int) str_replace('TO-', '', $last)) + 1 : 1;
+                $model->order_number = 'TO-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
             }
         });
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ReturnOrderType;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,5 +23,10 @@ class Customer extends Model
     public function saleOrders(): HasMany
     {
         return $this->hasMany(SaleOrder::class);
+    }
+
+    public function customerReturns(): HasMany
+    {
+        return $this->hasMany(ReturnOrder::class)->where('type', ReturnOrderType::CustomerReturn);
     }
 }

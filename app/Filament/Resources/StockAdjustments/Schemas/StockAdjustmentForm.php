@@ -33,7 +33,8 @@ class StockAdjustmentForm
                     ->nullable(),
                 Repeater::make('items')
                     ->relationship()
-                    ->defaultItems(0)
+                    ->defaultItems(1)
+                    ->minItems(1)
                     ->schema([
                         Grid::make(4)->schema([
                             Select::make('product_id')

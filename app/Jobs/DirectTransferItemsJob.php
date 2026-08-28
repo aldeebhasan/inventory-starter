@@ -45,6 +45,7 @@ class DirectTransferItemsJob implements ShouldQueue
                 transactionType: TransactionType::Transfer,
                 causable: $item,
                 reference: $this->order,
+                cost: $item->product->cost,
                 note: "TO #{$this->order->order_number}: direct transfer",
                 createdBy: $this->order->created_by,
             );

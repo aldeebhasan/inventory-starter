@@ -8,6 +8,7 @@ enum SaleOrderStatus: string
     case Confirmed = 'confirmed';
     case Picked = 'picked';
     case Shipped = 'shipped';
+    case Fulfilled = 'fulfilled';
     case Cancelled = 'cancelled';
 
     public function color(): string
@@ -16,7 +17,8 @@ enum SaleOrderStatus: string
             self::Draft => 'gray',
             self::Confirmed => 'warning',
             self::Picked => 'info',
-            self::Shipped => 'success',
+            self::Shipped => 'primary',
+            self::Fulfilled => 'success',
             self::Cancelled => 'danger',
         };
     }
@@ -28,6 +30,7 @@ enum SaleOrderStatus: string
             self::Confirmed => 'Confirmed',
             self::Picked => 'Picked',
             self::Shipped => 'Shipped',
+            self::Fulfilled => 'Fulfilled',
             self::Cancelled => 'Cancelled',
         };
     }

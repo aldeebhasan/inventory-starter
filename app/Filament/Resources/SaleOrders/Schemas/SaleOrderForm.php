@@ -41,7 +41,8 @@ class SaleOrderForm
                     ->nullable(),
                 Repeater::make('items')
                     ->relationship()
-                    ->defaultItems(0)
+                    ->defaultItems(1)
+                    ->minItems(1)
                     ->schema([
                         Grid::make(5)->schema([
                             Select::make('product_id')
@@ -53,6 +54,7 @@ class SaleOrderForm
                                 ->afterStateUpdated(function (Set $set, $state) {
                                     $product = Product::query()->find((int) $state);
                                     $set('unit_id', $product?->unit_id);
+                                    $set('unit_price', $product?->price);
                                 }),
                             Select::make('unit_id')
                                 ->label('Unit')
