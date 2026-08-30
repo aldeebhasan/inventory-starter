@@ -32,6 +32,7 @@ class ConfirmSaleOrderAction extends Action
                             causable: $record,
                             reference: $item,
                             cost: $item->product->cost,
+                            note: "SO #{$record->order_number}: reserve/decrease stock",
                             createdBy: Auth::id(),
                         );
                         if ($item->product->isInventory()) {
