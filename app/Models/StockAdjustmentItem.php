@@ -16,13 +16,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $product_id
  * @property StockAdjustmentOperation $operation
  * @property float $quantity
+ * @property float|null $cost
  * @property float|null $current_stock
  * @property StockAdjustmentItemStatus $item_status
  * @property string|null $failure_reason
  * @property-read Product $product
  * @property-read StockAdjustment $stockAdjustment
  */
-#[Fillable(['stock_adjustment_id', 'product_id', 'operation', 'quantity', 'current_stock', 'item_status', 'failure_reason'])]
+#[Fillable(['stock_adjustment_id', 'product_id', 'operation', 'quantity', 'cost', 'current_stock', 'item_status', 'failure_reason'])]
 class StockAdjustmentItem extends Model
 {
     /** @use HasFactory<StockAdjustmentItemFactory> */
@@ -32,6 +33,7 @@ class StockAdjustmentItem extends Model
         'operation' => StockAdjustmentOperation::class,
         'item_status' => StockAdjustmentItemStatus::class,
         'quantity' => 'float',
+        'cost' => 'float',
         'current_stock' => 'float',
     ];
 

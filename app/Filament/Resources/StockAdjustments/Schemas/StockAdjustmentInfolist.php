@@ -41,7 +41,7 @@ class StockAdjustmentInfolist
                     ->schema([
                         RepeatableEntry::make('items')
                             ->schema([
-                                Grid::make(6)->schema([
+                                Grid::make(7)->schema([
                                     TextEntry::make('product.name')
                                         ->label('Product')
                                         ->columnSpan(2),
@@ -54,6 +54,10 @@ class StockAdjustmentInfolist
                                         ->placeholder('—')
                                         ->columnSpan(1),
                                     TextEntry::make('quantity')
+                                        ->columnSpan(1),
+                                    TextEntry::make('cost')
+                                        ->money('USD')
+                                        ->placeholder('—')
                                         ->columnSpan(1),
                                     TextEntry::make('item_status')
                                         ->label('Status')

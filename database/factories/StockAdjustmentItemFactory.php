@@ -21,6 +21,7 @@ class StockAdjustmentItemFactory extends Factory
             'product_id' => Product::factory(),
             'operation' => StockAdjustmentOperation::Increase,
             'quantity' => fake()->randomFloat(2, 1, 100),
+            'cost' => null,
             'current_stock' => null,
             'item_status' => StockAdjustmentItemStatus::Pending,
             'failure_reason' => null,

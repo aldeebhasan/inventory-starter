@@ -38,8 +38,8 @@ class CancelRefundedOrderAction extends Action
                         foreach ($record->items as $item) {
                             $dto = new StockOperationDto(
                                 transactionType: TransactionType::Reversal,
-                                causable: $item,
-                                reference: $record,
+                                causable: $record,
+                                reference: $item,
                                 cost: $item->product->cost,
                                 note: "Cancel CRT #{$record->order_number}",
                                 createdBy: Auth::id(),

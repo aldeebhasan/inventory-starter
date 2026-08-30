@@ -236,6 +236,29 @@ it('job applies Increase and sets item to Applied', function () {
     ]);
 });
 
+it('job applies Increase with cost stored in the transaction', function () {
+    $product = Product::factory()->create();
+    $adjustment = StockAdjustment::factory()->processing()->create(['location_id' => $this->location->id]);
+    $item = StockAdjustmentItem::factory()->create([
+        'stock_adjustment_id' => $adjustment->id,
+        'product_id' => $product->id,
+        'operation' => StockAdjustmentOperation::Increase,
+        'quantity' => 10,
+        'cost' => 25.50,
+        'item_status' => StockAdjustmentItemStatus::Pending,
+    ]);
+
+    ApplyStockAdjustmentJob::dispatchSync($adjustment);
+
+    expect($item->fresh()->item_status)->toBe(StockAdjustmentItemStatus::Applied);
+
+    $this->assertDatabaseHas('inventorix_movements', [
+        'stockable_type' => Product::class,
+        'stockable_id' => $product->id,
+        'cost_per_unit' => 25.50,
+    ]);
+});
+
 it('job applies Decrease and sets item to Applied', function () {
     $product = Product::factory()->create();
     $adjustment = StockAdjustment::factory()->processing()->create(['location_id' => $this->location->id]);

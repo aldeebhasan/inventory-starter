@@ -41,15 +41,15 @@ class ReceiveTransferItemsJob implements ShouldQueue
         $item->update(['item_status' => TransferOrderItemStatus::Receiving]);
 
         try {
-            $transaction = Transaction::query()->where('causable_type', TransferOrderItem::class)
-                ->where('causable_id', $item->id)
+            $transaction = Transaction::query()->where('causable_type', TransferOrder::class)
+                ->where('causable_id', $this->order->id)
                 ->where('type', TransactionType::Transfer)
                 ->firstOrFail();
 
             $dto = new StockOperationDto(
                 transactionType: TransactionType::Transfer,
-                causable: $item,
-                reference: $this->order,
+                causable: $this->order,
+                reference: $item,
                 cost: $item->product->cost,
                 note: "TO #{$this->order->order_number}: receive at {$this->order->toLocation->name}",
                 createdBy: $this->order->created_by,

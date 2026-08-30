@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/aldeebhasan/Inventorix.git",
-                "reference": "3f0473df7bc64eb6b3bba2a953e2d0e892c74c3b"
+                "reference": "5dc0fe0d0c82db1917ba6e0f46432067c4959e51"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aldeebhasan/Inventorix/zipball/3f0473df7bc64eb6b3bba2a953e2d0e892c74c3b",
-                "reference": "3f0473df7bc64eb6b3bba2a953e2d0e892c74c3b",
+                "url": "https://api.github.com/repos/aldeebhasan/Inventorix/zipball/5dc0fe0d0c82db1917ba6e0f46432067c4959e51",
+                "reference": "5dc0fe0d0c82db1917ba6e0f46432067c4959e51",
                 "shasum": ""
             },
             "require": {
@@ -82,7 +82,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-23T16:00:13+00:00"
+            "time": "2026-08-30T23:05:43+00:00"
         },
         {
             "name": "anourvalar/eloquent-serialize",

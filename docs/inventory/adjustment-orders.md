@@ -73,7 +73,7 @@ enum StockAdjustmentItemStatus: string
 ## Models
 
 - `StockAdjustment` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => StockAdjustmentStatus`; relationships: `location()`, `items()`, `pendingItems()` (hasMany filtered by Pending), `failedItems()` (hasMany filtered by Failed), `createdBy()`
-- `StockAdjustmentItem` — relationships: `stockAdjustment()`, `product()`; casts: `operation => StockAdjustmentOperation`, `item_status => StockAdjustmentItemStatus`
+- `StockAdjustmentItem` — relationships: `stockAdjustment()`, `product()`; casts: `operation => StockAdjustmentOperation`, `item_status => StockAdjustmentItemStatus`, `cost => float`
 
 ### Model Methods on `StockAdjustment`
 
@@ -121,6 +121,7 @@ public function syncStatusFromItems(): void
 | product_id | unsignedBigInteger | FK → products.id |
 | operation | string | 'increase' / 'decrease' / 'adjust' |
 | quantity | decimal(12,4) | must be > 0 |
+| cost | decimal(12,4) | nullable — unit cost for Increase/Adjust operations, passed to `addStock`/`adjustStock` DTO |
 | current_stock | decimal(12,4) | nullable — snapshotted at confirm time |
 | item_status | string | default 'pending' |
 | failure_reason | text | nullable — populated when item_status = 'failed' |
@@ -198,6 +199,7 @@ class ApplyStockAdjustmentJob implements ShouldQueue
                     transactionType: TransactionType::Adjustment,
                     causable: $this->order,
                     reference: $item,
+                    cost: $item->cost,
                     note: "ADJ #{$this->order->order_number}: {$this->order->reason}",
                     createdBy: $this->order->created_by,
                 );
@@ -248,13 +250,14 @@ Use a dedicated `adjustments` queue so large orders don't starve other queues.
 | notes | Textarea | nullable |
 | items | Repeater | relationship(), defaultItems(0) — see below |
 
-Repeater items (Grid 4):
+Repeater items (Grid 5):
 
 | Field | Span | Notes |
 |---|---|---|
 | product_id | 2 | Select, searchable, live(), required |
-| operation | 1 | Select, options from StockAdjustmentOperation, required |
+| operation | 1 | Select, options from StockAdjustmentOperation, required, live() |
 | quantity | 1 | TextInput numeric, required, min 0.0001 |
+| cost | 1 | TextInput numeric, min 0, visible only for Increase/Adjust operations |
 
 > `current_stock` and `item_status` are not part of the form — they are managed by the workflow, not the user.
 
@@ -378,6 +381,7 @@ Display on `ViewStockAdjustment`:
 | operation | badge — success(Increase) / danger(Decrease) / warning(Adjust) |
 | current_stock | snapshot, shown after Confirm |
 | quantity | the adjustment value |
+| cost | unit cost (money formatted), shown as '—' when null |
 | item_status | badge — gray(Pending) / primary(Processing) / success(Applied) / danger(Failed) |
 | failure_reason | shown only when item_status = Failed |
 

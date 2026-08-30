@@ -493,37 +493,27 @@ it('receive job adds stock at destination and marks items as Received', function
     ]);
 });
 
-it('receive job fails items without a matching send transaction', function () {
+it('receive job fails all items when order has no send transaction', function () {
     $product = Product::factory()->create();
     $product->addStock(50, $this->fromLocation->id);
 
-    $order = TransferOrder::factory()->sending()->create([
+    $order = TransferOrder::factory()->create([
         'from_location_id' => $this->fromLocation->id,
         'to_location_id' => $this->toLocation->id,
+        'status' => TransferOrderStatus::Receiving,
     ]);
 
-    // Good item — send first to create the transaction
-    $goodItem = TransferOrderItem::factory()->create([
-        'transfer_order_id' => $order->id,
-        'product_id' => $product->id,
-        'quantity' => 5,
-        'item_status' => TransferOrderItemStatus::Pending,
-    ]);
-    SendTransferItemsJob::dispatchSync($order);
-
-    // Bad item — manually set to Sent but no transaction was ever created for it
-    $badItem = TransferOrderItem::factory()->create([
+    // Item manually set to Sent but no send was ever dispatched for the order
+    $item = TransferOrderItem::factory()->create([
         'transfer_order_id' => $order->id,
         'product_id' => $product->id,
         'quantity' => 5,
         'item_status' => TransferOrderItemStatus::Sent,
     ]);
 
-    $order->update(['status' => TransferOrderStatus::Receiving]);
     ReceiveTransferItemsJob::dispatchSync($order->fresh());
 
-    expect($goodItem->fresh()->item_status)->toBe(TransferOrderItemStatus::Received);
-    expect($badItem->fresh()->item_status)->toBe(TransferOrderItemStatus::Failed);
+    expect($item->fresh()->item_status)->toBe(TransferOrderItemStatus::Failed);
     expect($order->fresh()->status)->toBe(TransferOrderStatus::PartiallyCompleted);
 });
 

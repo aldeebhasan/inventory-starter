@@ -45,7 +45,7 @@ class ApplyStockAdjustmentJob implements ShouldQueue
                 transactionType: TransactionType::Adjustment,
                 causable: $this->order,
                 reference: $item,
-                cost: $item->product->cost,
+                cost: $item->cost,
                 note: "ADJ #{$this->order->order_number}: {$this->order->reason}",
                 createdBy: $this->order->created_by,
             );
