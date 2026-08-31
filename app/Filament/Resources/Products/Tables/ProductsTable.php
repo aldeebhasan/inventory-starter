@@ -21,6 +21,7 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 ImageColumn::make('image')->square()->defaultImageUrl(asset('images/default.png')),
                 TextColumn::make('name')->sortable()->searchable(),
