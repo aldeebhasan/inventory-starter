@@ -12,8 +12,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('return_order_id')->constrained('return_orders')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete();
             $table->decimal('quantity', 12, 3);
-            $table->decimal('unit_cost', 12, 3)->nullable();
+            $table->decimal('price', 12, 3)->nullable();
             $table->timestamps();
         });
     }

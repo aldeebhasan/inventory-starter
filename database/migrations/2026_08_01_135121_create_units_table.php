@@ -6,22 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('units', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100);
             $table->string('abbreviation', 20);
+            $table->foreignId('base_unit_id')->nullable()->constrained('units')->nullOnDelete();
+            $table->decimal('conversion_factor', 15, 6)->default(1);
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('units');

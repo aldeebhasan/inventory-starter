@@ -14,6 +14,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->string('operation');
             $table->decimal('quantity', 12, 4);
+            $table->decimal('cost', 12, 4)->nullable();
             $table->decimal('current_stock', 12, 4)->nullable();
             $table->string('item_status')->default('pending');
             $table->text('failure_reason')->nullable();

@@ -307,7 +307,7 @@ it('can create a return from a sale order with sale order item price', function 
     Livewire::test(CreateRefundedOrder::class)
         ->fillForm([
             'customer_id' => $this->customer->id,
-            'original_order_id' => $saleOrder->id,
+            'sale_order_id' => $saleOrder->id,
             'location_id' => $this->location->id,
             'reason' => 'Defective',
             'items.0.product_id' => $product->id,
@@ -319,8 +319,7 @@ it('can create a return from a sale order with sale order item price', function 
         ->assertRedirect();
 
     $return = ReturnOrder::query()->latest()->first();
-    expect($return->original_order_type)->toBe(SaleOrder::class)
-        ->and($return->original_order_id)->toBe($saleOrder->id);
+    expect($return->sale_order_id)->toBe($saleOrder->id);
 
     assertDatabaseHas(ReturnOrderItem::class, [
         'return_order_id' => $return->id,
@@ -347,7 +346,7 @@ it('can create a return on the fly with product price', function () {
         ->assertRedirect();
 
     $return = ReturnOrder::query()->latest()->first();
-    expect($return->original_order_id)->toBeNull();
+    expect($return->sale_order_id)->toBeNull();
 
     assertDatabaseHas(ReturnOrderItem::class, [
         'return_order_id' => $return->id,
@@ -375,8 +374,7 @@ it('uses sale order item price as cost when completing a return from sale order'
         'type' => ReturnOrderType::CustomerReturn,
         'customer_id' => $this->customer->id,
         'location_id' => $this->location->id,
-        'original_order_type' => SaleOrder::class,
-        'original_order_id' => $saleOrder->id,
+        'sale_order_id' => $saleOrder->id,
         'status' => ReturnOrderStatus::Draft,
     ]);
     ReturnOrderItem::factory()->create([

@@ -27,7 +27,7 @@ class CreateSaleReturnAction extends Action
                 SaleOrderStatus::Fulfilled,
             ]))
             ->url(fn (SaleOrder $record) => RefundedOrderResource::getUrl('create', [
-                'original_order_id' => $record->id,
+                'sale_order_id' => $record->id,
                 'customer_id' => $record->customer_id,
             ]));
     }

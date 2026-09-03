@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('order_number', 50)->unique();
             $table->string('type', 30);
             $table->string('status')->default('draft');
-            $table->nullableMorphs('original_order');
+            $table->foreignId('sale_order_id')->nullable()->constrained('sale_orders')->nullOnDelete();
             $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
             $table->unsignedBigInteger('location_id')->index();

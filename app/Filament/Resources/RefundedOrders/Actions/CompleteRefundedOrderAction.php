@@ -8,7 +8,6 @@ use Aldeebhasan\Inventorix\Facades\Inventorix;
 use Aldeebhasan\Inventorix\Models\Transaction;
 use App\Enums\ReturnOrderStatus;
 use App\Models\ReturnOrder;
-use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use Filament\Actions\Action;
 use Illuminate\Database\Eloquent\Collection;
@@ -58,12 +57,12 @@ class CompleteRefundedOrderAction extends Action
 
     private function loadSaleOrderItems(ReturnOrder $record): ?Collection
     {
-        if ($record->original_order_type !== SaleOrder::class || ! $record->original_order_id) {
+        if (! $record->sale_order_id) {
             return null;
         }
 
         return SaleOrderItem::query()
-            ->where('sale_order_id', $record->original_order_id)
+            ->where('sale_order_id', $record->sale_order_id)
             ->get();
     }
 }

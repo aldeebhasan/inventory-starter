@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('sale_order_id')->constrained('sale_orders')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete();
             $table->decimal('quantity', 12, 3);
             $table->decimal('unit_price', 12, 3)->nullable();
             $table->unsignedBigInteger('reservation_id')->nullable()->index();

@@ -2,7 +2,7 @@
 
 **Navigation Group:** Sales
 **Purpose:** Customer sends goods back to the warehouse -- stock is added back via `addStock()`.
-**References:** Sale Orders via `originalOrder()` morphTo.
+**References:** Sale Orders via `saleOrder()` belongsTo (`sale_order_id` FK).
 **Shared model:** `ReturnOrder` with `type = customer_return` -- scoped at the resource level.
 **Status Tracking:** Uses `TracksStatus` trait on `ReturnOrder` -- see `docs/status-tracking.md`.
 
@@ -18,7 +18,8 @@ A customer return can be started in two ways:
 | Field | Type | Notes |
 |---|---|---|
 | product_id | Select | required. If linked to a sale order, limited to that order's products |
-| quantity | Numeric | required |
+| unit_id | Select | locked to sale order item's unit when linked; free selection on the fly |
+| quantity | Numeric | required. Max capped to sale order item quantity when linked |
 | price | Numeric | the return price per unit. Defaults to sale order item price (if from order) or product price (if on the fly) |
 
 ### Inventory Cost on Completion
@@ -70,7 +71,7 @@ protected function mutateFormDataBeforeCreate(array $data): array
 |---|---|---|
 | order_number | TextInput | auto-generated CRT-XXXXX, unique |
 | customer_id | Select | relationship('customer', 'name'), searchable, required |
-| original_order_id | Select | from SaleOrders, nullable, label 'Original Sale Order'. When changed, resets items |
+| sale_order_id | Select | from SaleOrders, nullable, label 'Original Sale Order'. When changed, resets items and auto-selects customer |
 | location_id | Select | relationship('location', 'name'), required |
 | reason | TextInput | required |
 | notes | Textarea | nullable |

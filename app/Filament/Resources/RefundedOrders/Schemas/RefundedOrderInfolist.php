@@ -36,7 +36,7 @@ class RefundedOrderInfolist
                                 ->label('Created By')
                                 ->placeholder('-')
                                 ->columnSpan(1),
-                            TextEntry::make('originalOrder.order_number')
+                            TextEntry::make('saleOrder.order_number')
                                 ->label('Original Sale Order')
                                 ->placeholder('-')
                                 ->columnSpan(1),

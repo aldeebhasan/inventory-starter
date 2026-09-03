@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -21,8 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $order_number
  * @property ReturnOrderType $type
  * @property ReturnOrderStatus $status
- * @property string|null $original_order_type
- * @property int|null $original_order_id
+ * @property int|null $sale_order_id
  * @property int|null $customer_id
  * @property int|null $supplier_id
  * @property int $location_id
@@ -34,9 +32,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Customer|null $customer
  * @property-read Supplier|null $supplier
  * @property-read Location $location
- * @property-read Model|null $originalOrder
+ * @property-read SaleOrder|null $saleOrder
  */
-#[Fillable(['order_number', 'type', 'status', 'original_order_type', 'original_order_id', 'customer_id', 'supplier_id', 'location_id', 'reason', 'notes', 'created_by'])]
+#[Fillable(['order_number', 'type', 'status', 'sale_order_id', 'customer_id', 'supplier_id', 'location_id', 'reason', 'notes', 'created_by'])]
 class ReturnOrder extends Model
 {
     /** @use HasFactory<ReturnOrderFactory> */
@@ -61,9 +59,9 @@ class ReturnOrder extends Model
         });
     }
 
-    public function originalOrder(): MorphTo
+    public function saleOrder(): BelongsTo
     {
-        return $this->morphTo();
+        return $this->belongsTo(SaleOrder::class);
     }
 
     public function customer(): BelongsTo
