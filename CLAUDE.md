@@ -46,6 +46,7 @@
 | Stock Report page | `docs/inventory/stock-report.md` |
 | Movement History page | `docs/inventory/movement-history.md` |
 | Low Stock Alerts page | `docs/inventory/low-stock-alerts.md` |
+| Stock Reservations page | `docs/inventory/stock-reservations.md` |
 | Dashboard widgets | `docs/dashboard/widgets.md` |
 | Status tracking (global) | `docs/status-tracking.md` |
 
