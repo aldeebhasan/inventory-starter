@@ -49,11 +49,20 @@ it('auto-generates order number on creation', function () {
 });
 
 it('can create a purchase order', function () {
+    $product = Product::factory()->create();
+
     Livewire::test(CreatePurchaseOrder::class)
         ->fillForm([
             'supplier_id' => $this->supplier->id,
             'location_id' => $this->location->id,
             'ordered_at' => now()->toDateTimeString(),
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'unit_cost' => $product->cost,
+                ],
+            ],
         ])
         ->call('create')
         ->assertHasNoFormErrors()

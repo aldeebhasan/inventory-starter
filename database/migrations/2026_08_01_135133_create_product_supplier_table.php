@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
             $table->decimal('unit_cost', 12, 3)->nullable();
+            $table->foreignId('unit_id')->nullable()->constrained()->nullOnDelete();
             $table->string('supplier_sku', 100)->nullable();
             $table->unique(['product_id', 'supplier_id']);
         });

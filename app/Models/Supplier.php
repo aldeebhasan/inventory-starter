@@ -22,7 +22,7 @@ class Supplier extends Model
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'product_supplier')
-            ->withPivot(['unit_cost', 'supplier_sku']);
+            ->withPivot(['unit_cost', 'unit_id', 'supplier_sku']);
     }
 
     public function purchaseOrders(): HasMany

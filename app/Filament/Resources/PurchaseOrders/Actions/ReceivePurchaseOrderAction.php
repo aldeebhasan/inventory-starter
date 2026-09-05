@@ -28,11 +28,16 @@ class ReceivePurchaseOrderAction extends Action
             ->requiresConfirmation()
             ->action(function (PurchaseOrder $record) {
                 DB::transaction(function () use ($record) {
+                    $baseDto = new StockOperationDto(
+                        transactionType: TransactionType::Purchase,
+                        causable: $record,
+                        note: "PO #{$record->order_number}: receive stock",
+                        createdBy: Auth::id(),
+                    );
                     Inventorix::bulk(function (Transaction $tx) use ($record) {
                         foreach ($record->items as $item) {
                             $dto = new StockOperationDto(
                                 transaction: $tx,
-                                transactionType: TransactionType::Purchase,
                                 causable: $record,
                                 reference: $item,
                                 cost: $item->unit_cost,
@@ -45,7 +50,7 @@ class ReceivePurchaseOrderAction extends Action
                             }
                             $item->update(['received_quantity' => $convertedQty]);
                         }
-                    });
+                    }, $baseDto);
                     $record->update(['status' => PurchaseOrderStatus::Received, 'received_at' => now()]);
                 });
             });

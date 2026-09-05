@@ -69,6 +69,6 @@ class Product extends Model
     public function suppliers(): BelongsToMany
     {
         return $this->belongsToMany(Supplier::class, 'product_supplier')
-            ->withPivot(['unit_cost', 'supplier_sku']);
+            ->withPivot(['unit_cost', 'unit_id', 'supplier_sku']);
     }
 }

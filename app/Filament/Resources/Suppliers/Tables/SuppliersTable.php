@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Suppliers\Tables;
 
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
@@ -27,6 +28,7 @@ class SuppliersTable
                 TernaryFilter::make('is_active'),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ]);
     }

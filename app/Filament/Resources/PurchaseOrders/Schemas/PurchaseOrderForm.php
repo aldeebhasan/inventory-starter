@@ -2,9 +2,7 @@
 
 namespace App\Filament\Resources\PurchaseOrders\Schemas;
 
-use App\Models\Location;
 use App\Models\Product;
-use App\Models\Supplier;
 use App\Models\Unit;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
@@ -29,10 +27,23 @@ class PurchaseOrderForm
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->searchable()
-                    ->required(),
+                    ->required()
+                    ->preload()
+                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                        $items = $get('items') ?? [];
+                        foreach ($items as $key => $item) {
+                            $productId = $item['product_id'] ?? null;
+                            if (! $productId) {
+                                continue;
+                            }
+                            $cost = self::resolveSupplierCost((int) $productId, $state, $item['unit_id'] ?? null);
+                            $set("items.{$key}.unit_cost", $cost);
+                        }
+                    }),
                 Select::make('location_id')
+                    ->relationship('location', 'name')
+                    ->preload()
                     ->label('Warehouse')
-                    ->options(fn () => Location::all()->pluck('name', 'id'))
                     ->searchable()
                     ->required(),
                 DateTimePicker::make('ordered_at')
@@ -42,7 +53,7 @@ class PurchaseOrderForm
                     ->nullable(),
                 Repeater::make('items')
                     ->relationship()
-                    ->defaultItems(0)
+                    ->defaultItems(1)
                     ->schema([
                         Grid::make(5)->schema([
                             Select::make('product_id')
@@ -55,15 +66,12 @@ class PurchaseOrderForm
                                     $product = Product::query()->find((int) $state);
                                     $set('unit_id', $product?->unit_id);
 
-                                    $supplierId = $get('../../supplier_id');
-                                    if ($state && $supplierId) {
-                                        /** @var Supplier|null $supplier */
-                                        $supplier = $product?->suppliers()->where('supplier_id', $supplierId)->first();
-                                        /** @phpstan-ignore property.notFound */
-                                        if ($supplier?->pivot?->unit_cost) {
-                                            $set('unit_cost', $supplier->pivot->unit_cost);
-                                        }
+                                    if (! $product) {
+                                        return;
                                     }
+
+                                    $supplierId = $get('../../supplier_id');
+                                    $set('unit_cost', self::resolveSupplierCost($product->id, $supplierId, $product->unit_id));
                                 }),
                             Select::make('unit_id')
                                 ->label('Unit')
@@ -80,6 +88,16 @@ class PurchaseOrderForm
                                 })
                                 ->nullable()
                                 ->searchable()
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                    $productId = $get('product_id');
+                                    if (! $productId) {
+                                        return;
+                                    }
+
+                                    $supplierId = $get('../../supplier_id');
+                                    $set('unit_cost', self::resolveSupplierCost((int) $productId, $supplierId, $state));
+                                })
                                 ->columnSpan(1),
                             TextInput::make('quantity')
                                 ->numeric()
@@ -93,5 +111,49 @@ class PurchaseOrderForm
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * Resolve the unit cost for a product from the supplier pivot,
+     * converting if the selected unit differs from the stored unit.
+     * Falls back to the product's default cost.
+     */
+    private static function resolveSupplierCost(int $productId, mixed $supplierId, mixed $selectedUnitId): ?float
+    {
+        $product = Product::query()->find($productId);
+        if (! $product) {
+            return null;
+        }
+
+        if (! $supplierId) {
+            return $product->cost;
+        }
+
+        $supplierPivot = $product->suppliers()->where('supplier_id', (int) $supplierId)->first();
+
+        /** @phpstan-ignore property.notFound */
+        $storedCost = $supplierPivot?->pivot?->unit_cost;
+        if ($storedCost === null) {
+            return $product->cost;
+        }
+
+        /** @phpstan-ignore property.notFound */
+        $storedUnitId = $supplierPivot->pivot->unit_id;
+
+        if (! $selectedUnitId || ! $storedUnitId || (int) $selectedUnitId === (int) $storedUnitId) {
+            return $storedCost;
+        }
+
+        $storedUnit = Unit::query()->find((int) $storedUnitId);
+        $selectedUnit = Unit::query()->find((int) $selectedUnitId);
+
+        if (! $storedUnit || ! $selectedUnit) {
+            return $storedCost;
+        }
+
+        $storedFactor = $storedUnit->base_unit_id ? $storedUnit->conversion_factor : 1;
+        $selectedFactor = $selectedUnit->base_unit_id ? $selectedUnit->conversion_factor : 1;
+
+        return round($storedCost * $selectedFactor / $storedFactor, 3);
     }
 }
