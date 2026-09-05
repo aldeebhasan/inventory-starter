@@ -11,9 +11,15 @@ class CreateRefundedOrder extends CreateRecord
 {
     protected static string $resource = RefundedOrderResource::class;
 
-    protected function getDefaultFormData(): array
+    protected function fillForm(): void
     {
-        return Arr::only(request()->query(), ['sale_order_id', 'customer_id']);
+        $this->callHook('beforeFill');
+
+        $this->form->fill(
+            Arr::only(request()->query(), ['sale_order_id', 'customer_id']),
+        );
+
+        $this->callHook('afterFill');
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

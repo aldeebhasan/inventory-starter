@@ -36,6 +36,7 @@ class ReceivePurchaseOrderAction extends Action
                                 causable: $record,
                                 reference: $item,
                                 cost: $item->unit_cost,
+                                note: "PO #{$record->order_number}: receive stock",
                                 createdBy: Auth::id(),
                             );
                             $convertedQty = $item->convertedQuantity();

@@ -43,6 +43,7 @@ class CompleteRefundedOrderAction extends Action
                                 causable: $record,
                                 reference: $item,
                                 cost: $cost,
+                                note: "CRT #{$record->order_number}: refund stock return",
                                 createdBy: Auth::id(),
                             );
                             if ($item->product->isInventory()) {
