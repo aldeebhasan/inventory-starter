@@ -43,10 +43,25 @@
 | Adjustment Orders | `docs/inventory/adjustment-orders.md` |
 | Stocks page | `docs/inventory/inventories.md` |
 | Stocks Transactions page | `docs/inventory/inventory-transactions.md` |
-| Stock Report page | `docs/inventory/stock-report.md` |
+| Stock Report page | `docs/inventory/reports/stock-report.md` |
 | Movement History page | `docs/inventory/movement-history.md` |
-| Low Stock Alerts page | `docs/inventory/low-stock-alerts.md` |
+| Low Stock Alerts page | `docs/inventory/reports/low-stock-alerts.md` |
 | Stock Reservations page | `docs/inventory/stock-reservations.md` |
+| Inventory Valuation report | `docs/inventory/reports/inventory-valuation.md` |
+| Stock Velocity report | `docs/inventory/reports/stock-velocity.md` |
+| Product Movement Summary report | `docs/inventory/reports/product-movement-summary.md` |
+| Transaction Ledger report | `docs/inventory/reports/transaction-ledger.md` |
+| Adjustment Audit report | `docs/inventory/reports/adjustment-audit.md` |
+| Dead Stock report | `docs/inventory/reports/dead-stock.md` |
+| Overstock Alerts report | `docs/inventory/reports/overstock-alerts.md` |
+| Expiring Stock report | `docs/inventory/reports/expiring-stock.md` |
+| ABC Analysis report | `docs/inventory/reports/abc-analysis.md` |
+| Reorder Suggestions report | `docs/purchase/reports/reorder-suggestions.md` |
+| Purchase Cost Analysis report | `docs/purchase/reports/purchase-cost-analysis.md` |
+| Supplier Performance report | `docs/purchase/reports/supplier-performance.md` |
+| Sales Summary report | `docs/sales/reports/sales-summary.md` |
+| Customer Returns Analysis report | `docs/sales/reports/customer-returns-analysis.md` |
+| Reports roadmap (all phases) | `docs/reports-roadmap.md` |
 | Dashboard widgets | `docs/dashboard/widgets.md` |
 | Status tracking (global) | `docs/status-tracking.md` |
 
