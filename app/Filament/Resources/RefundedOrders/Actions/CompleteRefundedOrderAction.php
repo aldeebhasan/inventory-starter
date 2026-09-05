@@ -32,6 +32,12 @@ class CompleteRefundedOrderAction extends Action
                 DB::transaction(function () use ($record) {
                     $saleOrderItems = $this->loadSaleOrderItems($record);
 
+                    $baseDto = new StockOperationDto(
+                        transactionType: TransactionType::Sale,
+                        causable: $record,
+                        note: "CRT #{$record->order_number}: refund stock return",
+                        createdBy: Auth::id(),
+                    );
                     Inventorix::bulk(function (Transaction $tx) use ($record, $saleOrderItems) {
                         foreach ($record->items as $item) {
                             $saleItem = $saleOrderItems?->firstWhere('product_id', $item->product_id);
@@ -39,7 +45,6 @@ class CompleteRefundedOrderAction extends Action
 
                             $dto = new StockOperationDto(
                                 transaction: $tx,
-                                transactionType: TransactionType::Sale,
                                 causable: $record,
                                 reference: $item,
                                 cost: $cost,
@@ -50,7 +55,7 @@ class CompleteRefundedOrderAction extends Action
                                 $item->product->addStock($item->quantity, $record->location_id, $dto);
                             }
                         }
-                    });
+                    }, $baseDto);
                     $record->update(['status' => ReturnOrderStatus::Completed]);
                 });
             });

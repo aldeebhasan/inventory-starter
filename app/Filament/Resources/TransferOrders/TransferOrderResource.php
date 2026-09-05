@@ -27,6 +27,8 @@ class TransferOrderResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Inventory';
 
+    protected static ?int $navigationSort = 5;
+
     public static function form(Schema $schema): Schema
     {
         return TransferOrderForm::configure($schema);

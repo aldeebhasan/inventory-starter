@@ -30,6 +30,8 @@ class StockReservations extends Page implements HasTable
 
     protected static string|UnitEnum|null $navigationGroup = 'Inventory';
 
+    protected static ?int $navigationSort = 6;
+
     protected static ?string $navigationLabel = 'Stock Reservations';
 
     public function getTitle(): string|Htmlable

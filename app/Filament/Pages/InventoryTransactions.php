@@ -30,6 +30,8 @@ class InventoryTransactions extends Page implements HasTable
 
     protected static string|UnitEnum|null $navigationGroup = 'Inventory';
 
+    protected static ?int $navigationSort = 3;
+
     protected static ?string $navigationLabel = 'Stock Movements';
 
     public function getTitle(): string|Htmlable

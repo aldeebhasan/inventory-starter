@@ -28,6 +28,8 @@ class RefundedOrderResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Sales';
 
+    protected static ?int $navigationSort = 3;
+
     protected static ?string $label = 'Refunded Order';
 
     protected static ?string $pluralLabel = 'Refunded Orders';
