@@ -10,10 +10,10 @@ Must-have reports with high operational value. Build these first.
 
 | # | Report | Nav Group | Sort | Doc | Status |
 |---|--------|-----------|------|-----|--------|
-| 1 | Low Stock Alerts | Inventory | 7 | [inventory/reports/low-stock-alerts.md](inventory/reports/low-stock-alerts.md) | Documented |
-| 2 | Stock Report | Inventory | 8 | [inventory/reports/stock-report.md](inventory/reports/stock-report.md) | Documented |
-| 3 | Inventory Valuation | Inventory | 9 | [inventory/reports/inventory-valuation.md](inventory/reports/inventory-valuation.md) | Documented |
-| 4 | Dashboard Widgets | Dashboard | — | [dashboard/widgets.md](dashboard/widgets.md) | Documented |
+| 1 | Low Stock Alerts | Inventory | 7 | [inventory/reports/low-stock-alerts.md](inventory/reports/low-stock-alerts.md) | Done |
+| 2 | Stock Report | Inventory | 8 | [inventory/reports/stock-report.md](inventory/reports/stock-report.md) | Done |
+| 3 | Inventory Valuation | Inventory | 9 | [inventory/reports/inventory-valuation.md](inventory/reports/inventory-valuation.md) | Done |
+| 4 | Dashboard Widgets | Dashboard | — | [dashboard/widgets.md](dashboard/widgets.md) | Done |
 
 ---
 
@@ -23,10 +23,10 @@ Core analytical reports for demand planning, trend analysis, and audit.
 
 | # | Report | Nav Group | Sort | Doc | Status |
 |---|--------|-----------|------|-----|--------|
-| 5 | Stock Velocity & Runway | Inventory | 10 | [inventory/reports/stock-velocity.md](inventory/reports/stock-velocity.md) | Documented |
-| 6 | Product Movement Summary | Inventory | 11 | [inventory/reports/product-movement-summary.md](inventory/reports/product-movement-summary.md) | Documented |
-| 7 | Reorder Suggestions | Purchase | 3 | [purchase/reports/reorder-suggestions.md](purchase/reports/reorder-suggestions.md) | Documented |
-| 8 | Transaction Ledger | Inventory | 12 | [inventory/reports/transaction-ledger.md](inventory/reports/transaction-ledger.md) | Documented |
+| 5 | Stock Velocity & Runway | Inventory | 10 | [inventory/reports/stock-velocity.md](inventory/reports/stock-velocity.md) | Done |
+| 6 | Product Movement Summary | Inventory | 11 | [inventory/reports/product-movement-summary.md](inventory/reports/product-movement-summary.md) | Done |
+| 7 | Reorder Suggestions | Purchase | 3 | [purchase/reports/reorder-suggestions.md](purchase/reports/reorder-suggestions.md) | Done |
+| 8 | Transaction Ledger | Inventory | 12 | [inventory/reports/transaction-ledger.md](inventory/reports/transaction-ledger.md) | Done |
 
 ---
 
