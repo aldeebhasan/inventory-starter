@@ -31,7 +31,7 @@ class LowStockAlerts extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
 
     protected static ?int $navigationSort = 7;
 
@@ -40,6 +40,11 @@ class LowStockAlerts extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Low Stock Alerts';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Products that have fallen below their minimum threshold. Create purchase orders directly from here.';
     }
 
     public static function getNavigationBadge(): ?string

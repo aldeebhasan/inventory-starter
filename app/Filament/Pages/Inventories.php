@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Models\Stock;
 use Aldeebhasan\Inventorix\Models\Threshold;
+use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
@@ -15,6 +16,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +39,11 @@ class Inventories extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Stocks';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'View current stock levels per product and location. Set min/max thresholds to trigger alerts.';
     }
 
     public function table(Table $table): Table
@@ -63,6 +70,11 @@ class Inventories extends Page implements HasTable
                     ->label('Brand')
                     ->placeholder('—'),
 
+                TextColumn::make('stockable.categories')
+                    ->label('Categories')
+                    ->state(fn (Stock $record): string => $record->stockable?->categories?->pluck('name')->join(', ') ?: '—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('location.name')
                     ->label('Location')
                     ->sortable(),
@@ -81,6 +93,16 @@ class Inventories extends Page implements HasTable
                     ->label('Available')
                     ->numeric(decimalPlaces: 2)
                     ->state(fn (Stock $record): float => $record->quantity - $record->reserved_quantity),
+
+                TextColumn::make('valuation')
+                    ->label('Valuation')
+                    ->state(function (Stock $record): string {
+                        $available = $record->quantity - $record->reserved_quantity;
+                        $cost = $record->stockable?->cost ?? 0;
+
+                        return number_format($available * $cost, 2);
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('threshold_min')
                     ->label('Min Threshold')
@@ -154,6 +176,36 @@ class Inventories extends Page implements HasTable
                         return $query->where('stockable_id', $data['value'])
                             ->where('stockable_type', Product::class);
                     }),
+
+                SelectFilter::make('category')
+                    ->label('Category')
+                    ->options(fn () => Category::query()->pluck('name', 'id'))
+                    ->searchable()
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (blank($data['value'])) {
+                            return $query;
+                        }
+
+                        return $query->whereHasMorph('stockable', [Product::class],
+                            fn (Builder $q) => $q->whereHas('categories', fn ($c) => $c->where('categories.id', $data['value']))
+                        );
+                    }),
+
+                TernaryFilter::make('low_stock_only')
+                    ->label('Low Stock Only')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereExists(function ($sub) {
+                            $sub->from('inventorix_thresholds')
+                                ->whereColumn('inventorix_thresholds.stockable_id', 'inventorix_stocks.stockable_id')
+                                ->whereColumn('inventorix_thresholds.stockable_type', 'inventorix_stocks.stockable_type')
+                                ->where(function ($q) {
+                                    $q->whereColumn('inventorix_thresholds.location_id', 'inventorix_stocks.location_id')
+                                        ->orWhereNull('inventorix_thresholds.location_id');
+                                })
+                                ->whereColumn('inventorix_stocks.quantity', '<=', 'inventorix_thresholds.min_quantity');
+                        }),
+                        false: fn (Builder $query) => $query,
+                    ),
             ])
             ->recordActions([
                 Action::make('set_threshold')

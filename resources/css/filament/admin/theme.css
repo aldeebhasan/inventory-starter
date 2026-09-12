@@ -92,7 +92,7 @@
 
 /* Remove heavy table wrapper shadow */
 .fi-ta-ctn {
-    @apply shadow-none ring-1 ring-gray-200 dark:ring-white/10 rounded-xl overflow-hidden;
+    @apply shadow-none ring-1 ring-gray-200 dark:ring-white/10 rounded-xl overflow-visible;
 }
 
 /* ─── Cards / stats widgets ───────────────────────────────── */

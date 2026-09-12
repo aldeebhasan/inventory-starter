@@ -27,7 +27,7 @@ class InventoryValuation extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCurrencyDollar;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
 
     protected static ?int $navigationSort = 9;
 
@@ -36,6 +36,11 @@ class InventoryValuation extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Inventory Valuation';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Financial value of on-hand inventory by product and location, with cost breakdown and total share.';
     }
 
     protected function getHeaderWidgets(): array

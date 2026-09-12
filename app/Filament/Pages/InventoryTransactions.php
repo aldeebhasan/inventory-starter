@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Enums\MovementType;
+use Aldeebhasan\Inventorix\Enums\TransactionStatus;
+use Aldeebhasan\Inventorix\Enums\TransactionType;
 use Aldeebhasan\Inventorix\Models\Movement;
 use App\Models\Location;
 use App\Models\Product;
@@ -37,6 +39,11 @@ class InventoryTransactions extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Stock Movements';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Detailed audit trail of every stock change — additions, deductions, and their source documents.';
     }
 
     public function table(Table $table): Table
@@ -90,6 +97,18 @@ class InventoryTransactions extends Page implements HasTable
                     ->badge()
                     ->placeholder('—'),
 
+                TextColumn::make('source_document')
+                    ->label('Source Document')
+                    ->state(function (Movement $record): string {
+                        $causable = $record->transaction?->causable;
+                        if (! $causable) {
+                            return '—';
+                        }
+
+                        return $causable->order_number ?? class_basename($causable).' #'.$causable->id;
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('note')
                     ->label('Note')
                     ->placeholder('—')
@@ -136,6 +155,28 @@ class InventoryTransactions extends Page implements HasTable
                         MovementType::Add->value => 'Add',
                         MovementType::Deduct->value => 'Deduct',
                     ]),
+
+                SelectFilter::make('transaction_type')
+                    ->label('Transaction Type')
+                    ->options(TransactionType::class)
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (blank($data['value'])) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('transaction', fn (Builder $q) => $q->where('type', $data['value']));
+                    }),
+
+                SelectFilter::make('transaction_status')
+                    ->label('Transaction Status')
+                    ->options(TransactionStatus::class)
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (blank($data['value'])) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('transaction', fn (Builder $q) => $q->where('status', $data['value']));
+                    }),
 
                 Filter::make('date_range')
                     ->label('Date Range')

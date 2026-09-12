@@ -30,7 +30,7 @@ class StockVelocityReport extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
 
     protected static ?int $navigationSort = 10;
 
@@ -39,6 +39,11 @@ class StockVelocityReport extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Stock Velocity & Runway';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'How fast each product is consumed and how many days of stock remain at current usage rates.';
     }
 
     /** @var Collection<string, object>|null */

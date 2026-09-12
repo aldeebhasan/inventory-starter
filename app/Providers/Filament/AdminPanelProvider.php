@@ -38,8 +38,11 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Catalog'),
                 NavigationGroup::make('Sales'),
+                NavigationGroup::make('Sales Reports')->collapsed(),
                 NavigationGroup::make('Purchase'),
+                NavigationGroup::make('Purchase Reports')->collapsed(),
                 NavigationGroup::make('Inventory'),
+                NavigationGroup::make('Inventory Reports')->collapsed(),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth('full')

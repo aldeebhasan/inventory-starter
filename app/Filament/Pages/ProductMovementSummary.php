@@ -32,7 +32,7 @@ class ProductMovementSummary extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowTrendingUp;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
 
     protected static ?int $navigationSort = 11;
 
@@ -41,6 +41,11 @@ class ProductMovementSummary extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Product Movement Summary';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Aggregated stock additions and deductions per product over a date range, with net change and turnover rate.';
     }
 
     /** @var Collection<int, object>|null */

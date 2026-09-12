@@ -39,6 +39,11 @@ class StockReservations extends Page implements HasTable
         return 'Stock Reservations';
     }
 
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Track reserved stock for pending sale orders — see what is held, fulfilled, or released.';
+    }
+
     public function table(Table $table): Table
     {
         return $table

@@ -33,7 +33,7 @@ class ReorderSuggestions extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Purchase';
+    protected static string|UnitEnum|null $navigationGroup = 'Purchase Reports';
 
     protected static ?int $navigationSort = 3;
 
@@ -42,6 +42,11 @@ class ReorderSuggestions extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return 'Reorder Suggestions';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return 'Low-stock products with suggested reorder quantities based on consumption velocity and thresholds.';
     }
 
     /** @var Collection<string, object>|null */
