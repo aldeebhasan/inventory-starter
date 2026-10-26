@@ -6,6 +6,8 @@ use App\Filament\Pages\SupplierPerformance;
 use App\Models\User;
 
 beforeEach(function () {
+    // Full page renders need the Vite manifest, which CI doesn't build; these tests only inspect the sidebar HTML.
+    $this->withoutVite();
     $this->actingAs(User::factory()->create());
 });
 
