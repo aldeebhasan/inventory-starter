@@ -29,7 +29,9 @@ class SalesSummary extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBarSquare;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Sales Reports';
+    protected static string|UnitEnum|null $navigationGroup = 'Sales';
+
+    protected static ?string $navigationParentItem = 'Reports';
 
     protected static ?int $navigationSort = 4;
 

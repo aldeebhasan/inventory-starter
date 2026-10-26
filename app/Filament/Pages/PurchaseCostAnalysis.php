@@ -31,7 +31,9 @@ class PurchaseCostAnalysis extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Purchase Reports';
+    protected static string|UnitEnum|null $navigationGroup = 'Purchase';
+
+    protected static ?string $navigationParentItem = 'Reports';
 
     protected static ?int $navigationSort = 4;
 

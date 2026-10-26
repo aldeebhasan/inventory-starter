@@ -32,7 +32,9 @@ class ProductMovementSummary extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowTrendingUp;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationParentItem = 'Reports';
 
     protected static ?int $navigationSort = 11;
 

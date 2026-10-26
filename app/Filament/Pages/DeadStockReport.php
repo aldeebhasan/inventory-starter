@@ -31,7 +31,9 @@ class DeadStockReport extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBoxXMark;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationParentItem = 'Reports';
 
     protected static ?int $navigationSort = 14;
 

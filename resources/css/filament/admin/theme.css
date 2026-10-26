@@ -19,9 +19,69 @@
     @apply border-b border-white/10! bg-blue-950 dark:bg-gray-900;
 }
 
-/* Navigation group labels */
+/* Navigation groups — accordion sections */
+.fi-sidebar-nav-groups {
+    @apply gap-y-1!;
+}
+
+.fi-sidebar-group {
+    @apply rounded-lg transition-colors;
+}
+
+.fi-sidebar-group.fi-collapsible:not(.fi-collapsed) {
+    @apply bg-white/5 pb-1;
+}
+
+.fi-sidebar-group-btn {
+    @apply rounded-lg px-1 py-1 cursor-pointer select-none hover:bg-white/10 transition-colors;
+}
+
 .fi-sidebar-group-label {
-    @apply text-xs font-semibold tracking-widest uppercase text-blue-300/60 dark:text-gray-400 px-3 py-1.5;
+    @apply text-xs font-semibold tracking-widest uppercase text-blue-300/60 dark:text-gray-400 px-2 py-1;
+}
+
+.fi-sidebar-group-btn:hover .fi-sidebar-group-label,
+.fi-sidebar-group:not(.fi-collapsed) > .fi-sidebar-group-btn .fi-sidebar-group-label {
+    @apply text-white dark:text-gray-200;
+}
+
+/* Section containing the current page */
+.fi-sidebar-group.fi-active > .fi-sidebar-group-btn .fi-sidebar-group-label {
+    @apply text-white;
+}
+
+.fi-sidebar-group.fi-active > .fi-sidebar-group-btn {
+    @apply border-l-2 border-blue-400 rounded-l-none;
+}
+
+.fi-sidebar-group-collapse-btn {
+    @apply text-blue-300/60! transition-transform duration-200;
+}
+
+.fi-sidebar-group-items {
+    @apply mt-1 px-1;
+}
+
+/* "Reports" sub-section inside a module group */
+.fi-sidebar-reports-item {
+    @apply mt-1 pt-1 border-t border-white/10;
+}
+
+.fi-sidebar-reports-item > .fi-sidebar-item-btn {
+    @apply cursor-pointer select-none;
+}
+
+.fi-sidebar-reports-item > .fi-sidebar-item-btn::after {
+    content: '';
+    @apply ms-auto size-3 shrink-0 border-r-2 border-b-2 border-blue-300/60 rotate-45 -translate-y-0.5 transition-transform duration-200;
+}
+
+.fi-sidebar-reports-item.fi-reports-collapsed > .fi-sidebar-item-btn::after {
+    @apply -rotate-45 translate-y-0;
+}
+
+.fi-sidebar-reports-item.fi-reports-collapsed > .fi-sidebar-sub-group-items {
+    @apply hidden;
 }
 
 /* Nav items — lighter text when inactive */

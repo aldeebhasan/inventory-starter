@@ -29,7 +29,9 @@ class ExpiringStock extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Inventory Reports';
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationParentItem = 'Reports';
 
     protected static ?int $navigationSort = 16;
 

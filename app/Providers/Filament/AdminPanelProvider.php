@@ -9,10 +9,13 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -38,13 +41,16 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Catalog'),
                 NavigationGroup::make('Sales'),
-                NavigationGroup::make('Sales Reports')->collapsed(),
                 NavigationGroup::make('Purchase'),
-                NavigationGroup::make('Purchase Reports')->collapsed(),
                 NavigationGroup::make('Inventory'),
-                NavigationGroup::make('Inventory Reports')->collapsed(),
+            ])
+            ->navigationItems([
+                $this->reportsNavigationItem('Sales'),
+                $this->reportsNavigationItem('Purchase'),
+                $this->reportsNavigationItem('Inventory'),
             ])
             ->sidebarCollapsibleOnDesktop()
+            ->renderHook(PanelsRenderHook::SIDEBAR_NAV_END, fn (): string => view('filament.sidebar-accordion')->render())
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
@@ -73,5 +79,17 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+
+    /**
+     * A URL-less parent item that holds a module's report pages (pages set `$navigationParentItem = 'Reports'`).
+     */
+    protected function reportsNavigationItem(string $group): NavigationItem
+    {
+        return NavigationItem::make('Reports')
+            ->group($group)
+            ->icon(Heroicon::OutlinedChartBar)
+            ->sort(1000)
+            ->extraAttributes(['class' => 'fi-sidebar-reports-item']);
     }
 }
