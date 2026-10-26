@@ -4,10 +4,12 @@ namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Models\Stock;
 use Aldeebhasan\Inventorix\Models\Threshold;
+use App\Filament\Exports\OverstockAlertsExporter;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -17,7 +19,8 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use UnitEnum;
 
 class OverstockAlerts extends Page implements HasTable
@@ -46,30 +49,34 @@ class OverstockAlerts extends Page implements HasTable
         return 'Products exceeding their maximum threshold — identify excess inventory tying up capital.';
     }
 
-    /** @var Collection<string, Threshold>|null */
-    protected ?Collection $thresholdCache = null;
-
-    protected function getThresholds(): Collection
+    /**
+     * Max quantity of the stock's threshold, preferring the location-specific one over the global one.
+     */
+    protected static function maxThresholdSubquery(): QueryBuilder
     {
-        if ($this->thresholdCache !== null) {
-            return $this->thresholdCache;
-        }
-
-        $this->thresholdCache = Threshold::query()
-            ->where('stockable_type', Product::class)
+        return Threshold::query()
+            ->select('max_quantity')
+            ->whereColumn('inventorix_thresholds.stockable_type', 'inventorix_stocks.stockable_type')
+            ->whereColumn('inventorix_thresholds.stockable_id', 'inventorix_stocks.stockable_id')
+            ->where(function (Builder $q): void {
+                $q->whereColumn('inventorix_thresholds.location_id', 'inventorix_stocks.location_id')
+                    ->orWhereNull('inventorix_thresholds.location_id');
+            })
             ->whereNotNull('max_quantity')
-            ->get()
-            ->keyBy(fn ($t) => $t->stockable_id.'-'.($t->location_id ?? 'global'));
-
-        return $this->thresholdCache;
+            ->orderByRaw('inventorix_thresholds.location_id is null')
+            ->limit(1)
+            ->toBase();
     }
 
-    protected function getThresholdFor(Stock $record): ?Threshold
+    public static function surplus(Stock $record): ?float
     {
-        $thresholds = $this->getThresholds();
+        $max = $record->getAttribute('max_threshold_quantity');
 
-        return $thresholds->get($record->stockable_id.'-'.$record->location_id)
-            ?? $thresholds->get($record->stockable_id.'-global');
+        if ($max === null) {
+            return null;
+        }
+
+        return max(0.0, ($record->quantity - $record->reserved_quantity) - (float) $max);
     }
 
     public function table(Table $table): Table
@@ -77,7 +84,9 @@ class OverstockAlerts extends Page implements HasTable
         return $table
             ->query(
                 Stock::query()
-                    ->with(['stockable.brand', 'location'])
+                    ->select('inventorix_stocks.*')
+                    ->addSelect(['max_threshold_quantity' => static::maxThresholdSubquery()])
+                    ->with(['stockable' => fn (MorphTo $morphTo) => $morphTo->morphWith([Product::class => ['brand']]), 'location'])
                     ->whereHasMorph('stockable', [Product::class])
                     ->where('quantity', '>', 0)
                     ->whereRaw('quantity - reserved_quantity > (
@@ -88,6 +97,9 @@ class OverstockAlerts extends Page implements HasTable
                         AND inventorix_thresholds.max_quantity IS NOT NULL
                     )')
             )
+            ->headerActions([
+                ExportAction::make()->exporter(OverstockAlertsExporter::class),
+            ])
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -120,26 +132,16 @@ class OverstockAlerts extends Page implements HasTable
 
                 TextColumn::make('max_threshold')
                     ->label('Max Threshold')
-                    ->state(function (Stock $record): string {
-                        $threshold = $this->getThresholdFor($record);
-
-                        return $threshold?->max_quantity !== null ? number_format((float) $threshold->max_quantity, 2) : '—';
-                    }),
+                    ->state(fn (Stock $record): string => Inventories::formatThreshold($record->getAttribute('max_threshold_quantity'))),
 
                 TextColumn::make('surplus')
                     ->label('Surplus')
                     ->badge()
                     ->color('warning')
                     ->state(function (Stock $record): string {
-                        $threshold = $this->getThresholdFor($record);
-                        if (! $threshold || $threshold->max_quantity === null) {
-                            return '—';
-                        }
+                        $surplus = static::surplus($record);
 
-                        $available = $record->quantity - $record->reserved_quantity;
-                        $surplus = $available - (float) $threshold->max_quantity;
-
-                        return $surplus > 0 ? number_format($surplus, 2) : '0.00';
+                        return $surplus === null ? '—' : number_format($surplus, 2);
                     }),
             ])
             ->filters([

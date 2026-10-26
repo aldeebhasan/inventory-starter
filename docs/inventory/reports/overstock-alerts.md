@@ -27,31 +27,34 @@ Shows all products above their maximum stock threshold. Helps prevent capital lo
 | On Hand | inventorix_stocks.quantity | |
 | Reserved | inventorix_stocks.reserved_quantity | |
 | Available | quantity - reserved_quantity | computed |
-| Max Threshold | inventorix_thresholds.max_quantity | |
-| Surplus | available - max_threshold | warning badge |
+| Max Threshold | `max_threshold_quantity` selected subquery | location-specific threshold preferred over the global one |
+| Surplus | max(0, available - max_threshold) | warning badge |
 
 ## Default Sort
 
-Surplus DESC (most overstocked first).
+On Hand (`quantity`) DESC.
+
+## Header Actions
+
+**Export** — `ExportAction` with `App\Filament\Exports\OverstockAlertsExporter` (CSV/XLSX, queued). Exports the current filtered table query. Columns: Product, Brand, Location, On Hand, Reserved, Available, Max Threshold, Surplus. `modifyQuery()` eager-loads `location` and `stockable` (Product → brand).
 
 ## Data Source
 
 ```php
 Stock::query()
-    ->with(['stockable.brand', 'location'])
+    ->select('inventorix_stocks.*')
+    ->addSelect(['max_threshold_quantity' => /* correlated subquery: location threshold first, then global */])
+    ->with(['stockable' => fn (MorphTo $m) => $m->morphWith([Product::class => ['brand']]), 'location'])
     ->whereHasMorph('stockable', [Product::class])
-    ->whereHas('thresholds', fn ($q) => $q->whereNotNull('max_quantity'))
-    ->whereRaw('quantity - reserved_quantity > (
-        SELECT max_quantity FROM inventorix_thresholds
-        WHERE inventorix_thresholds.stockable_id = inventorix_stocks.stockable_id
-        AND inventorix_thresholds.stockable_type = inventorix_stocks.stockable_type
-        AND inventorix_thresholds.location_id = inventorix_stocks.location_id
-    )')
+    ->where('quantity', '>', 0)
+    ->whereRaw('quantity - reserved_quantity > (SELECT COALESCE(MAX(max_quantity), quantity + 1) FROM inventorix_thresholds WHERE <same stockable> AND (<same location> OR location_id IS NULL) AND max_quantity IS NOT NULL)')
 ```
-
-Alternative: use `Inventorix::checkThresholds()` if it supports overstock detection, or query stocks joined with thresholds where `quantity > max_quantity`.
 
 ## Performance
 
-- Single query with subquery join on thresholds
-- Paginate 25 rows default
+- The max threshold is selected with the page query; the page no longer preloads every threshold in the table into PHP
+- Constant query count per page (4 queries for 2 or 8 rows)
+
+## Tests
+
+`tests/Feature/Inventory/OverstockAlertsPageTest.php` — render, listing, filters, location-over-global max threshold + surplus, query growth, export (fake dispatch, row values, real CSV).

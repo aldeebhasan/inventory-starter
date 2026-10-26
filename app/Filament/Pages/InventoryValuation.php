@@ -3,11 +3,13 @@
 namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Models\Stock;
+use App\Filament\Exports\InventoryValuationExporter;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -17,6 +19,8 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class InventoryValuation extends Page implements HasTable
@@ -52,25 +56,33 @@ class InventoryValuation extends Page implements HasTable
         ];
     }
 
+    /**
+     * Value of all available product stock, aggregated in SQL: SUM((quantity - reserved_quantity) * products.cost).
+     */
+    public static function grandTotal(): float
+    {
+        return (float) Stock::query()
+            ->join('products', 'products.id', '=', 'inventorix_stocks.stockable_id')
+            ->where('inventorix_stocks.stockable_type', (new Product)->getMorphClass())
+            ->whereNull('products.deleted_at')
+            ->where('inventorix_stocks.quantity', '>', 0)
+            ->sum(DB::raw('(inventorix_stocks.quantity - inventorix_stocks.reserved_quantity) * products.cost'));
+    }
+
     public function table(Table $table): Table
     {
-        $grandTotal = Stock::query()
-            ->whereHasMorph('stockable', [Product::class])
-            ->where('quantity', '>', 0)
-            ->get()
-            ->sum(function (Stock $stock) {
-                $available = $stock->quantity - $stock->reserved_quantity;
-
-                return $available * ($stock->stockable?->getAttribute('cost') ?? 0);
-            });
+        $grandTotal = static::grandTotal();
 
         return $table
             ->query(
                 Stock::query()
-                    ->with(['stockable.brand', 'stockable.categories', 'location'])
+                    ->with(['stockable' => fn (MorphTo $morphTo) => $morphTo->morphWith([Product::class => ['brand', 'categories']]), 'location'])
                     ->whereHasMorph('stockable', [Product::class])
                     ->where('quantity', '>', 0)
             )
+            ->headerActions([
+                ExportAction::make()->exporter(InventoryValuationExporter::class),
+            ])
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -81,7 +93,10 @@ class InventoryValuation extends Page implements HasTable
                             fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
                         );
                     })
-                    ->sortable(),
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Product::query()->select('name')->whereColumn('products.id', 'inventorix_stocks.stockable_id'),
+                        $direction,
+                    )),
 
                 TextColumn::make('stockable.brand.name')
                     ->label('Brand')
