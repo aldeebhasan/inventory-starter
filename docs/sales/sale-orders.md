@@ -2,7 +2,7 @@
 
 **Navigation Group:** Sales
 **Purpose:** Sell goods to customers from a warehouse location, with reservation-based stock holding and full lifecycle tracking.
-**Referenced by:** Refunded Orders -- a refunded order can reference a SO as its `originalOrder`.
+**Referenced by:** Refunded Orders -- a refunded order can reference a SO via `ReturnOrder::saleOrder()` (`sale_order_id`). See `docs/sales/customer-returns.md`.
 **Status Tracking:** Uses `TracksStatus` trait -- see `docs/status-tracking.md`.
 
 **Do not:** Call `$product->deductStock()` directly for a sale. All stock deductions from selling must go through a SaleOrder workflow. Do not skip the Confirm step -- shipping without prior confirmation bypasses the stock hold and risks overselling.

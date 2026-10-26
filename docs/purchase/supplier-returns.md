@@ -1,5 +1,7 @@
 # Supplier Returns
 
+> **Status: Not implemented.** This is a design spec. No `SupplierReturns` resource exists yet. What exists today: the shared `ReturnOrder` model supports `type = supplier_return` (with `supplier_id` and an `SRT-XXXXX` order number), and `ReturnOrderFactory::supplierReturn()`. There is no link from a return to a purchase order (`return_orders` has `sale_order_id` only), so the `originalOrder()` morphTo below does not exist. For the implemented model, see `docs/sales/customer-returns.md`.
+
 **Navigation Group:** Purchase
 **Purpose:** Warehouse sends goods back to a supplier → stock is deducted via `deductStock()`.
 **References:** Purchase Orders via `originalOrder()` morphTo.

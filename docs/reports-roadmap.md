@@ -1,6 +1,6 @@
 # Reports Roadmap
 
-All reports are custom Filament Pages with `InteractsWithTable` (read-only). Each report lives in its domain's navigation group. Documentation for each report is linked below.
+All reports are custom Filament Pages with `InteractsWithTable` (read-only). Each report lives in its domain's navigation group, nested under that group's collapsible "Reports" item. Documentation for each report is linked below.
 
 **Removed reports (merged into existing pages):**
 - **Stock Report** → merged into Stocks page (categories, valuation, category filter, low stock filter added)
@@ -62,7 +62,7 @@ Additional reports that add value but are not critical for initial operation.
 ## Architecture Rules
 
 1. **Page pattern:** All reports follow `app/Filament/Pages/Inventories.php` — implement `HasTable`, use `InteractsWithTable`
-2. **Navigation:** Reports stay in their domain group (Inventory / Purchase / Sales), not a separate "Reports" group
+2. **Navigation:** Reports stay in their domain group (Inventory / Purchase / Sales), not a separate "… Reports" group. Each report page sets `$navigationGroup` to the module and `$navigationParentItem = 'Reports'`. The URL-less "Reports" parent item per module is registered in `AdminPanelProvider::reportsNavigationItem()`, which also marks it active when one of its report pages is open. The sidebar is an accordion (only the active group expanded; each "Reports" item collapses on its own) -- see `resources/views/filament/sidebar-accordion.blade.php`.
 3. **No new migrations:** All data exists in inventorix tables + application order tables
 4. **Performance:** Batch SQL aggregations, never per-row facade calls. Paginate 25 rows default
 5. **Testing:** Each page gets a test file at `tests/Feature/{Group}/{ReportName}PageTest.php`
@@ -73,10 +73,15 @@ Additional reports that add value but are not critical for initial operation.
 ```
 Dashboard
 Catalog    → Products (1), Categories (2), Brands (3), Units (4), Addons (5)
-Sales      → Customers (1), Sale Orders (2), Refunded Orders (3), Sales Summary (4), Returns Analysis (5)
-Purchase   → Suppliers (1), Purchase Orders (2), Reorder Suggestions (3), Cost Analysis (4), Supplier Performance (5)
+Sales      → Customers (1), Sale Orders (2), Refunded Orders (3)
+             Reports ▸ Sales Summary (4), Returns Analysis (5)
+Purchase   → Suppliers (1), Purchase Orders (2)
+             Reports ▸ Reorder Suggestions (3), Cost Analysis (4), Supplier Performance (5)
 Inventory  → Locations (1), Stocks (2), Stock Movements (3), Adjustments (4), Transfers (5),
-             Reservations (6), Low Stock Alerts (7), Valuation (9),
-             Velocity (10), Movement Summary (11),
-             Dead Stock (14), Overstock (15), Expiring Stock (16), ABC Analysis (17)
+             Stock Reservations (6)
+             Reports ▸ Low Stock Alerts (7), Inventory Valuation (9), Stock Velocity (10),
+                       Movement Summary (11), Dead Stock (14), Overstock Alerts (15),
+                       Expiring Stock (16), ABC Analysis (17)
 ```
+
+Numbers are `$navigationSort`. Each module's "Reports" item has sort 1000, so it always sits last in its group.
