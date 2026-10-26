@@ -67,6 +67,8 @@ Additional reports that add value but are not critical for initial operation.
 4. **Performance:** Batch SQL aggregations, never per-row facade calls. Paginate 25 rows default
 5. **Testing:** Each page gets a test file at `tests/Feature/{Group}/{ReportName}PageTest.php`
 6. **View file:** Each page needs `resources/views/filament/pages/{kebab-name}.blade.php` containing `{{ $this->table }}`
+7. **Exports:** Each report has an `ExportAction` in its table header with an exporter in `app/Filament/Exports/`. Exports run as queued job batches (a queue worker must run in production) and notify the user via panel database notifications. The scheduled `exports:prune` command (daily, `routes/console.php`) deletes exports older than 7 days with their files -- run `php artisan exports:prune --days=N` to clean up manually. The production cron must run `php artisan schedule:run`.
+8. **No per-row queries:** Each report test includes a `countQueries()` (tests/Pest.php) check that the query count does not grow with the row count.
 
 ## Navigation Order (complete)
 

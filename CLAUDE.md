@@ -157,12 +157,9 @@ Location: `tests/Feature/{Group}/{Model}ResourceTest.php`. Never skip or delete 
 
 ## Orchestration (multi-agent)
 
-For multi-part features (more than one resource, page, or action), the main thread acts as orchestrator and does not implement directly. Agents live in `.claude/agents/`.
+Orchestrate only when a feature has **3 or more independent units** (resources, pages, or actions). Everything smaller is done directly in the main thread — subagents start cold and re-read files, so they cost more tokens. Agents live in `.claude/agents/`.
 
-1. **`explorer`** — gather context and get a proposed split into work units.
-2. **`implementer`** — one agent per unit. Run independent units in parallel; use `isolation: "worktree"` when parallel units touch the same files.
-3. **`laravel-tester`** — one per finished unit. If it reports an app bug, send it back to that unit's implementer (via SendMessage).
-4. **`reviewer`** — review the combined diff; fix or delegate each finding.
-5. Orchestrator runs `php artisan test --compact` itself and reports the result.
-
-Single-file changes and small fixes skip orchestration and are done directly.
+1. The main thread explores itself: reads the module doc, finds the files and the sibling to copy, and splits the work.
+2. **`implementer`** — one per unit; it builds the unit and its tests. Put the file paths and sibling file in its prompt so it does not re-explore. Run units in parallel; use `isolation: "worktree"` when parallel units touch the same files. Send fixes back to the same agent via SendMessage.
+3. **`reviewer`** — only when the user asks, or when the change touches stock operations or status workflows.
+4. The main thread runs `php artisan test --compact` itself and reports the result.
