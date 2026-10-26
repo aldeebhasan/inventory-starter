@@ -27,6 +27,8 @@ class CompleteRefundedOrderAction extends Action
             ->visible(fn (ReturnOrder $record) => $record->status === ReturnOrderStatus::Draft)
             ->requiresConfirmation()
             ->action(function (ReturnOrder $record) {
+                $record->loadMissing('items.product', 'items.unit');
+
                 DB::transaction(function () use ($record) {
                     $baseDto = new StockOperationDto(
                         transactionType: TransactionType::Sale,
@@ -46,7 +48,7 @@ class CompleteRefundedOrderAction extends Action
                                 createdBy: Auth::id(),
                             );
                             if ($item->product->isInventory()) {
-                                $item->product->addStock($item->quantity, $record->location_id, $dto);
+                                $item->product->addStock($item->convertedQuantity(), $record->location_id, $dto);
                             }
                         }
                     }, $baseDto);

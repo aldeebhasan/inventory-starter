@@ -28,6 +28,8 @@ When the refund is completed and stock is added back, the `cost` passed to `addS
 
 Non-inventory products (`! $product->isInventory()`) are skipped -- no stock is added or reversed for them.
 
+Quantities are converted to the product's base unit with `ReturnOrderItem::convertedQuantity()` on both Complete (`addStock`) and Cancel (`deductStock`) -- e.g. a 2-ton line moves 2000 kg.
+
 ## State Machine
 
 ```
@@ -49,7 +51,7 @@ Cancel from Draft: no inventory reversal needed
 
 **`ReturnOrderItem`** -- columns `return_order_id`, `product_id`, `unit_id`, `quantity`, `price`; relationships `returnOrder()`, `product()`, `unit()`
 
-`ReturnOrderStatus` enum: `Draft` (gray), `Completed` (success), `Cancelled` (danger).
+`ReturnOrderStatus` enum: `Draft` (gray), `Approved` (info -- used by supplier returns only), `Completed` (success), `Cancelled` (danger).
 
 ## Filament Resource
 
@@ -103,8 +105,8 @@ Filters: `SelectFilter` on status, `TrashedFilter`. Row actions: View; Edit and 
 | Action | Class | Visible on | Effect |
 |---|---|---|---|
 | Complete | `Actions/CompleteRefundedOrderAction` | Draft | `Inventorix::bulk()` → `addStock()` per inventory item (causable = order, reference = item, cost = product cost), then status → Completed |
-| Cancel | `Actions/CancelRefundedOrderAction` | Draft, Completed | Requires a reason. If Completed: `deductStock()` per inventory item (`TransactionType::Reversal`, causable = order, reference = item, cost = product cost). Logs the status change with the reason, then status → Cancelled |
+| Cancel | `Actions/CancelRefundedOrderAction` | Draft, Completed | Requires a reason. If Completed: `deductStock()` per inventory item (`TransactionType::Reversal`, causable = order, reference = item; no cost -- outbound stock is valued from consumed lots). Logs the status change with the reason, then status → Cancelled |
 
 ## Testing
 
-`tests/Feature/Sales/RefundedOrderResourceTest.php` -- list (excludes supplier returns, status filter, soft delete), create (CRT prefix, required fields, from sale order vs on the fly pricing), view page, complete adds stock at product cost in both creation modes (asserted on the movement's `cost_per_unit`), cancel from Draft and Completed (stock reversal, reason logged), and guard conditions (no edit after Draft, hidden actions per status).
+`tests/Feature/Sales/RefundedOrderResourceTest.php` -- list (excludes supplier returns, status filter, soft delete), create (CRT prefix, required fields, from sale order vs on the fly pricing), view page, complete adds stock at product cost in both creation modes (asserted on the movement's `cost_per_unit`), cancel from Draft and Completed (stock reversal, reason logged), derived-unit lines converted to the base unit on complete and cancel, and guard conditions (no edit after Draft, hidden actions per status).

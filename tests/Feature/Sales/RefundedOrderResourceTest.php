@@ -12,6 +12,7 @@ use App\Models\ReturnOrder;
 use App\Models\ReturnOrderItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
+use App\Models\Unit;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
@@ -416,6 +417,53 @@ it('uses product cost when completing a return on the fly', function () {
     expect($return->fresh()->status)->toBe(ReturnOrderStatus::Completed);
     expect($product->totalStock($this->location))->toBe(13.0);
     expect(returnMovementCost($returnItem))->toBe(20.0);
+});
+
+// --- Unit conversion ---
+
+function refundInTons($test, ReturnOrderStatus $status): array
+{
+    $baseUnit = Unit::create(['name' => 'Kilogram', 'abbreviation' => 'kg']);
+    $ton = Unit::create([
+        'name' => 'Ton',
+        'abbreviation' => 't',
+        'base_unit_id' => $baseUnit->id,
+        'conversion_factor' => 1000,
+    ]);
+    $product = Product::factory()->create(['unit_id' => $baseUnit->id]);
+    $product->addStock(5000, $test->location->id);
+
+    $return = ReturnOrder::factory()->create([
+        'type' => ReturnOrderType::CustomerReturn,
+        'customer_id' => $test->customer->id,
+        'location_id' => $test->location->id,
+        'status' => $status,
+    ]);
+    ReturnOrderItem::factory()->create([
+        'return_order_id' => $return->id,
+        'product_id' => $product->id,
+        'unit_id' => $ton->id,
+        'quantity' => 2,
+    ]);
+
+    return [$product, $return];
+}
+
+it('adds back the base-unit quantity when completing a refund in a derived unit', function () {
+    [$product, $return] = refundInTons($this, ReturnOrderStatus::Draft);
+
+    Livewire::test(ViewRefundedOrder::class, ['record' => $return->id])->callAction('complete');
+
+    expect($product->totalStock($this->location))->toBe(7000.0);
+});
+
+it('reverses the base-unit quantity when cancelling a completed refund in a derived unit', function () {
+    [$product, $return] = refundInTons($this, ReturnOrderStatus::Completed);
+
+    Livewire::test(ViewRefundedOrder::class, ['record' => $return->id])->callAction('cancel', data: ['reason' => 'Wrong refund']);
+
+    expect($return->fresh()->status)->toBe(ReturnOrderStatus::Cancelled)
+        ->and($product->totalStock($this->location))->toBe(3000.0);
 });
 
 function returnMovementCost(ReturnOrderItem $item): float

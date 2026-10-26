@@ -33,6 +33,8 @@ class CancelRefundedOrderAction extends Action
                 Textarea::make('reason')->label('Cancellation Reason'),
             ])
             ->action(function (ReturnOrder $record, array $data) {
+                $record->loadMissing('items.product', 'items.unit');
+
                 DB::transaction(function () use ($record, $data) {
                     if ($record->status === ReturnOrderStatus::Completed) {
                         foreach ($record->items as $item) {
@@ -40,12 +42,11 @@ class CancelRefundedOrderAction extends Action
                                 transactionType: TransactionType::Reversal,
                                 causable: $record,
                                 reference: $item,
-                                cost: $item->product->cost,
                                 note: "Cancel CRT #{$record->order_number}",
                                 createdBy: Auth::id(),
                             );
                             if ($item->product->isInventory()) {
-                                $item->product->deductStock($item->quantity, $record->location_id, $dto);
+                                $item->product->deductStock($item->convertedQuantity(), $record->location_id, $dto);
                             }
                         }
                     }
