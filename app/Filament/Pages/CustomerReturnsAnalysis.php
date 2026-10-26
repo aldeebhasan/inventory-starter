@@ -5,11 +5,12 @@ namespace App\Filament\Pages;
 use App\Enums\ReturnOrderStatus;
 use App\Enums\ReturnOrderType;
 use App\Enums\SaleOrderStatus;
+use App\Filament\Exports\CustomerReturnsAnalysisExporter;
 use App\Models\Customer;
 use App\Models\Product;
-use App\Models\ReturnOrderItem;
 use App\Models\SaleOrderItem;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -21,7 +22,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use UnitEnum;
 
 class CustomerReturnsAnalysis extends Page implements HasTable
@@ -50,9 +50,6 @@ class CustomerReturnsAnalysis extends Page implements HasTable
         return 'Return volumes and rates per product — identify quality issues or problematic SKUs.';
     }
 
-    /** @var Collection<int|string, SaleOrderItem>|null */
-    protected ?Collection $salesCache = null;
-
     protected function getDateFrom(): ?string
     {
         return $this->tableFilters['date_range']['from'] ?? null;
@@ -63,58 +60,50 @@ class CustomerReturnsAnalysis extends Page implements HasTable
         return $this->tableFilters['date_range']['until'] ?? null;
     }
 
-    protected function getSalesAggregates(): Collection
+    /**
+     * Correlated SUM of shipped/picked sales for the row's product within the active date range.
+     *
+     * @return Builder<SaleOrderItem>
+     */
+    protected function qtySoldSubquery(): Builder
     {
-        if ($this->salesCache !== null) {
-            return $this->salesCache;
-        }
-
-        $query = SaleOrderItem::query()
-            ->join('sale_orders', 'sale_orders.id', '=', 'sale_order_items.sale_order_id')
-            ->whereIn('sale_orders.status', [SaleOrderStatus::Shipped, SaleOrderStatus::Picked])
-            ->selectRaw('sale_order_items.product_id, SUM(sale_order_items.quantity) as qty_sold')
-            ->groupBy('sale_order_items.product_id');
-
         $dateFrom = $this->getDateFrom();
         $dateUntil = $this->getDateUntil();
 
-        if ($dateFrom) {
-            $query->whereDate('sale_orders.created_at', '>=', $dateFrom);
-        }
-        if ($dateUntil) {
-            $query->whereDate('sale_orders.created_at', '<=', $dateUntil);
-        }
-
-        $this->salesCache = $query->get()->keyBy('product_id');
-
-        return $this->salesCache;
+        return SaleOrderItem::query()
+            ->join('sale_orders', 'sale_orders.id', '=', 'sale_order_items.sale_order_id')
+            ->whereColumn('sale_order_items.product_id', 'products.id')
+            ->whereIn('sale_orders.status', [SaleOrderStatus::Shipped, SaleOrderStatus::Picked])
+            ->when($dateFrom, fn (Builder $q) => $q->whereDate('sale_orders.created_at', '>=', $dateFrom))
+            ->when($dateUntil, fn (Builder $q) => $q->whereDate('sale_orders.created_at', '<=', $dateUntil))
+            ->selectRaw('COALESCE(SUM(sale_order_items.quantity), 0)');
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->query(
-                ReturnOrderItem::query()
-                    ->join('return_orders', 'return_orders.id', '=', 'return_order_items.return_order_id')
-                    ->where('return_orders.type', ReturnOrderType::CustomerReturn)
-                    ->where('return_orders.status', ReturnOrderStatus::Completed)
-                    ->selectRaw('
-                        return_order_items.product_id as id,
-                        return_order_items.product_id,
-                        SUM(return_order_items.quantity) as qty_returned,
-                        SUM(return_order_items.quantity * COALESCE(return_order_items.price, 0)) as refund_amount
-                    ')
-                    ->groupBy('return_order_items.product_id')
-            )
+            // Closure: evaluated per request so the qty_sold subquery sees the current date filter.
+            // Grouped on products.id so the record key is the product: rows can be resolved/exported by key.
+            ->query(fn (): Builder => Product::withTrashed()
+                ->join('return_order_items', 'return_order_items.product_id', '=', 'products.id')
+                ->join('return_orders', 'return_orders.id', '=', 'return_order_items.return_order_id')
+                ->where('return_orders.type', ReturnOrderType::CustomerReturn)
+                ->where('return_orders.status', ReturnOrderStatus::Completed)
+                ->select('products.*')
+                ->selectRaw('
+                    SUM(return_order_items.quantity) as qty_returned,
+                    SUM(return_order_items.quantity * COALESCE(return_order_items.price, 0)) as refund_amount
+                ')
+                ->selectSub($this->qtySoldSubquery(), 'qty_sold')
+                ->groupBy('products.id'))
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(CustomerReturnsAnalysisExporter::class),
+            ])
             ->columns([
-                TextColumn::make('product_name')
+                TextColumn::make('name')
                     ->label('Product')
-                    ->state(fn (ReturnOrderItem $record): string => Product::find($record->product_id)->name ?? '—')
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->whereIn('return_order_items.product_id',
-                            Product::where('name', 'like', "%{$search}%")->pluck('id')
-                        );
-                    }),
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where('products.name', 'like', "%{$search}%")),
 
                 TextColumn::make('qty_returned')
                     ->label('Qty Returned')
@@ -123,37 +112,14 @@ class CustomerReturnsAnalysis extends Page implements HasTable
 
                 TextColumn::make('qty_sold')
                     ->label('Qty Sold (Period)')
-                    ->state(function (ReturnOrderItem $record): string {
-                        $sales = $this->getSalesAggregates()->get($record->product_id);
-
-                        return number_format((float) ($sales?->getAttribute('qty_sold') ?? 0), 3);
-                    }),
+                    ->numeric(decimalPlaces: 3)
+                    ->sortable(),
 
                 TextColumn::make('return_rate')
                     ->label('Return Rate')
                     ->badge()
-                    ->state(function (ReturnOrderItem $record): string {
-                        $sales = $this->getSalesAggregates()->get($record->product_id);
-                        $qtySold = (float) ($sales?->getAttribute('qty_sold') ?? 0);
-
-                        if ($qtySold <= 0) {
-                            return '—';
-                        }
-
-                        return number_format(((float) $record->getAttribute('qty_returned') / $qtySold) * 100, 1).'%';
-                    })
-                    ->color(function (ReturnOrderItem $record): string {
-                        $sales = $this->getSalesAggregates()->get($record->product_id);
-                        $qtySold = (float) ($sales?->getAttribute('qty_sold') ?? 0);
-
-                        if ($qtySold <= 0) {
-                            return 'gray';
-                        }
-
-                        $rate = ((float) $record->getAttribute('qty_returned') / $qtySold) * 100;
-
-                        return $rate > 10 ? 'danger' : 'gray';
-                    }),
+                    ->state(fn (Product $record): string => ($rate = self::returnRate($record)) === null ? '—' : number_format($rate, 1).'%')
+                    ->color(fn (Product $record): string => (self::returnRate($record) ?? 0) > 10 ? 'danger' : 'gray'),
 
                 TextColumn::make('refund_amount')
                     ->label('Refund Amount')
@@ -208,9 +174,23 @@ class CustomerReturnsAnalysis extends Page implements HasTable
                             return $query;
                         }
 
-                        return $query->where('return_order_items.product_id', $data['value']);
+                        return $query->where('products.id', $data['value']);
                     }),
             ])
             ->defaultSort('qty_returned', 'desc');
+    }
+
+    /**
+     * Returned qty as a percentage of qty sold in the period, or null when nothing was sold.
+     */
+    public static function returnRate(Product $record): ?float
+    {
+        $qtySold = (float) $record->getAttribute('qty_sold');
+
+        if ($qtySold <= 0) {
+            return null;
+        }
+
+        return ((float) $record->getAttribute('qty_returned') / $qtySold) * 100;
     }
 }

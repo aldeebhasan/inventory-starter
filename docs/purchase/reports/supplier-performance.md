@@ -14,9 +14,11 @@ Evaluates suppliers on key delivery and cost metrics: order volume, fulfillment 
 
 | Filter | Type | Notes |
 |---|---|---|
-| Date From | DatePicker | optional |
-| Date Until | DatePicker | optional |
+| Date From | DatePicker | optional; limits the list to suppliers with POs in range **and** limits every metric to POs whose `ordered_at` is in range |
+| Date Until | DatePicker | optional; same as above |
 | Supplier | Select | optional |
+
+Before this change the date range only decided which suppliers were listed. Every metric still counted all-time POs.
 
 ## Table Columns
 
@@ -38,31 +40,31 @@ Total Spend DESC (biggest suppliers first).
 
 ## Data Source
 
+The query is passed as a closure, so it is rebuilt on each request. `inDateRange()` applies the current date filter (`purchase_orders.ordered_at`) to every subquery.
+
 ```php
 Supplier::query()
     ->withCount([
-        'purchaseOrders as total_pos' => fn ($q) => $q->when($dateFrom, ...),
-        'purchaseOrders as received_pos' => fn ($q) => $q->where('status', PurchaseOrderStatus::Received),
-        'purchaseOrders as cancelled_pos' => fn ($q) => $q->where('status', PurchaseOrderStatus::Cancelled),
+        'purchaseOrders as total_pos' => fn ($q) => $this->inDateRange($q),
+        'purchaseOrders as received_pos' => fn ($q) => $this->inDateRange($q)->where('status', Received),
+        'purchaseOrders as cancelled_pos' => fn ($q) => $this->inDateRange($q)->where('status', Cancelled),
     ])
     ->addSelect([
-        'total_spend' => PurchaseOrderItem::query()
-            ->selectRaw('SUM(quantity * unit_cost)')
-            ->whereColumn('purchase_order_items.purchase_order_id', 'purchase_orders.id')
-            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
-            ->where('purchase_orders.status', PurchaseOrderStatus::Received)
-            ->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
-        'avg_lead_time' => PurchaseOrder::query()
-            ->selectRaw('AVG(DATEDIFF(updated_at, ordered_at))')
-            ->whereColumn('supplier_id', 'suppliers.id')
-            ->where('status', PurchaseOrderStatus::Received),
+        'total_spend' => $this->inDateRange(PurchaseOrderItem::query())   // SUM(quantity * unit_cost), received POs
+            ->join('purchase_orders', ...)->where('purchase_orders.status', Received)->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
+        'total_items' => /* same, SUM(quantity) */,
+        'avg_lead_time' => $this->inDateRange(PurchaseOrder::query())  // AVG(DATEDIFF(updated_at, ordered_at)); julianday on sqlite
+            ->whereColumn('supplier_id', 'suppliers.id')->where('status', Received),
     ])
 ```
 
-Alternative: build as a raw query with GROUP BY on supplier_id for better performance.
+Sortable: Supplier, Total POs, Received, Cancelled, Total Spend.
+
+## Export
+
+Header `ExportAction` → `App\Filament\Exports\SupplierPerformanceExporter` (model `Supplier`). Columns: Supplier, Total POs, Received, Cancelled, Fulfillment Rate %, Avg Lead Time (days), Total Items, Total Spend, Avg Unit Cost. The export uses the table's filtered and sorted query, including the date-scoped subqueries.
 
 ## Performance
 
-- Complex aggregation; use subqueries or a single raw query with GROUP BY
-- Supplier count is typically small (tens to low hundreds), so performance is not a concern
+- One query with correlated count/sum subqueries, and no per-row queries. The query count stays the same however many rows are shown (covered by a `countQueries` test).
 - Paginate 25 rows default

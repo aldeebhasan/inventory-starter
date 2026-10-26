@@ -14,69 +14,66 @@ Combines low stock alerts with consumption velocity and supplier pricing to prod
 
 | Filter | Type | Notes |
 |---|---|---|
-| Location | Select | optional |
-| Category | Select | optional |
-| Urgency | Select | Critical (<7d) / Warning (<14d) / All low stock, default All |
+| Location | Select | optional (`location_id`) |
+| Category | Select | optional (`whereHasMorph` on product categories) |
+| Urgency | Select | Critical (<7d) / Warning (<14d) / All low stock, default All. Filters on days of stock remaining in SQL; rows with no consumption in the window (∞ days) only appear under "All". |
+
+Before this change the Urgency filter did nothing: its query closure returned the query unchanged.
 
 ## Table Columns
 
 | Column | Source | Notes |
 |---|---|---|
-| Product | products.name | searchable |
-| Location | inventorix_locations.name | |
+| Product | products.name | searchable; sortable (subquery on `products.name`) |
+| Location | inventorix_locations.name | sortable |
 | Available | quantity - reserved_quantity | computed |
-| Min Threshold | inventorix_thresholds.min_quantity | |
-| Avg Daily Consumption | deduct movements sum / 30 days | numeric(2) |
+| Min Threshold | `min_quantity` subquery (location threshold, else global) | |
+| Avg Daily Consumption | `total_deducted` / 30 | numeric(2) |
 | Days Until Stockout | available / avg_daily_consumption | integer, `∞` if no consumption |
-| Suggested Reorder Qty | max_threshold - available, or 30d consumption if no max | integer |
-| Preferred Supplier | from product_supplier pivot (first supplier) | supplier name |
+| Suggested Reorder Qty | max_threshold - available, or 30d consumption if no max; at least min - available | integer |
+| Preferred Supplier | first supplier from product_supplier pivot | supplier name |
 | Supplier Unit Cost | product_supplier.unit_cost | numeric(3), fallback to product.cost |
-| Est. Reorder Cost | suggested_qty x supplier_unit_cost | numeric(2), currency |
+| Est. Reorder Cost | suggested_qty x supplier_unit_cost | numeric(2) |
 
 ## Default Sort
 
-Days Until Stockout ASC (most urgent first).
+`quantity` ASC (lowest stock first).
 
 ## Row Actions
 
-**Create Purchase Order** — redirects to `CreatePurchaseOrder` page with:
-- `supplier_id` pre-selected (from preferred supplier)
-- One item pre-filled with the product, suggested quantity, and supplier cost
+**Create Purchase Order**: redirects to `CreatePurchaseOrder` with `product_id` and `supplier_id` (preferred supplier) prefilled.
 
 ## Data Source
 
+Everything is computed in one SQL query. The page used to load every low-stock stock ID (`Inventorix::lowStockItems()`), every product threshold, and every 30-day velocity aggregate into PHP, whatever page was on screen. None of that is loaded any more.
+
 ```php
-// Step 1: Get low stock items
-$lowStockItems = Inventorix::lowStockItems(
-    stockableType: Product::class,
-    locationId: $locationId,
-);
-
-// Step 2: Batch velocity (same as Stock Velocity report)
-$velocities = Movement::query()
-    ->where('type', MovementType::Deduct)
-    ->where('created_at', '>=', now()->subDays(30))
-    ->selectRaw('stockable_id, location_id, SUM(quantity) as total_deducted')
-    ->groupBy('stockable_id', 'location_id')
-    ->get()
-    ->keyBy(fn ($m) => $m->stockable_id . '-' . $m->location_id);
-
-// Step 3: Supplier info from product_supplier pivot
-// Product::with('suppliers') — use first supplier or the one with lowest cost
+Stock::query()
+    ->with(['stockable' => fn (MorphTo $m) => $m->morphWith([Product::class => ['suppliers']]), 'location'])
+    ->where('inventorix_stocks.stockable_type', Product::class)
+    // same low-stock rule as Inventorix::lowStockItems(): any matching threshold (location or global) with quantity <= min
+    ->whereExists(matchingThresholds()->whereColumn('inventorix_stocks.quantity', '<=', 'inventorix_thresholds.min_quantity'))
+    ->select('inventorix_stocks.*')
+    ->selectSub(thresholdValue('min_quantity'), 'min_quantity')   // location-specific threshold preferred over global
+    ->selectSub(thresholdValue('max_quantity'), 'max_quantity')
+    ->selectSub(recentDeductions('SUM(quantity)'), 'total_deducted') // deduct movements, last VELOCITY_DAYS (30) days
 ```
 
-Suggested Reorder Qty logic:
+Days of stock (also used by the Urgency filter) is `(quantity - reserved_quantity) * 30 / NULLIF(SUM(deducted in window), 0)`. A product with no consumption gives NULL, which means infinite days. The filter applies it as `whereRaw('(subquery) < ?', [7|14])`.
+
+The eager load uses `morphWith` rather than `'stockable.suppliers'` because nested morph paths break the queued export's query serialization.
+
+Suggested Reorder Qty logic (`ReorderSuggestions::getSuggestedQty()`, shared with the exporter):
 ```php
-if ($maxThreshold) {
-    $suggestedQty = $maxThreshold - $available;
-} else {
-    // Order 30 days of consumption
-    $suggestedQty = ceil($avgDailyConsumption * 30);
-}
-$suggestedQty = max($suggestedQty, $minThreshold - $available);
+$suggested = $max !== null ? $max - $available : ceil($avgDaily * 30);
+$suggested = max($suggested, $min - $available, 0);
 ```
+
+## Export
+
+Header `ExportAction` → `App\Filament\Exports\ReorderSuggestionsExporter` (model `Stock`). Columns: Product, Location, Available, Min Threshold, Avg Daily Consumption, Days Until Stockout (blank = ∞), Suggested Reorder Qty, Preferred Supplier, Supplier Unit Cost, Est. Reorder Cost. The export uses the table's filtered and sorted query.
 
 ## Performance
 
-- 2 queries (low stock + velocity batch) + eager load suppliers
+- One table query (threshold and velocity subqueries) plus eager loads for products, suppliers, and locations. The query count stays the same however many rows are shown (covered by a `countQueries` test).
 - Paginate 25 rows default

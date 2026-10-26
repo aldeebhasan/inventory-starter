@@ -40,28 +40,33 @@ Total Revenue DESC (top sellers first).
 
 ## Data Source
 
+The table is based on `Product` (grouped by `products.id`), so the record key is the product. Rows can then be resolved by key, and the queued export can chunk them by key.
+
 ```php
-SaleOrderItem::query()
+Product::withTrashed()
+    ->with(['brand', 'categories'])   // eager-loaded for the current page (no per-row Product::find)
+    ->join('sale_order_items', 'sale_order_items.product_id', '=', 'products.id')
     ->join('sale_orders', 'sale_orders.id', '=', 'sale_order_items.sale_order_id')
-    ->join('products', 'products.id', '=', 'sale_order_items.product_id')
-    ->whereIn('sale_orders.status', [
-        SaleOrderStatus::Shipped,    // completed sales
-        SaleOrderStatus::Picked,     // dispatched sales
-    ])
-    ->whereBetween('sale_orders.created_at', [$dateFrom, $dateUntil])
-    ->when($productId, fn ($q) => $q->where('product_id', $productId))
-    ->when($customerId, fn ($q) => $q->where('sale_orders.customer_id', $customerId))
+    ->whereIn('sale_orders.status', [Confirmed, Shipped, Picked, Fulfilled])
+    ->select('products.*')
     ->selectRaw('
-        sale_order_items.product_id,
         SUM(sale_order_items.quantity) as qty_sold,
         AVG(sale_order_items.unit_price) as avg_unit_price,
         SUM(sale_order_items.quantity * sale_order_items.unit_price) as total_revenue,
         SUM(sale_order_items.quantity * products.cost) as total_cost
     ')
-    ->groupBy('sale_order_items.product_id')
+    ->groupBy('products.id')
 ```
 
+Filters: date range → `sale_orders.created_at`; product → `products.id`; customer → `sale_orders.customer_id`; category → `whereHas('categories')`. The category filter used to pluck every matching product ID into PHP; it no longer does.
+
 Margin computed in PHP: `total_revenue - total_cost`.
+
+Sortable: Qty Sold, Avg Unit Price, Total Revenue, Total Cost (SQL aliases).
+
+## Export
+
+Header `ExportAction` → `App\Filament\Exports\SalesSummaryExporter` (model `Product`). Columns: Product, Brand, Category (first), Qty Sold, Avg Unit Price, Total Revenue, Total Cost, Gross Margin, Margin %. The export uses the table's filtered and sorted query.
 
 ## Stats Header (optional)
 
@@ -76,5 +81,5 @@ Display summary stats above the table:
 
 ## Performance
 
-- Single aggregation query with GROUP BY
+- Single aggregation query with GROUP BY, plus one eager-load query each for brands and categories. The query count stays the same however many rows are shown (covered by a `countQueries` test).
 - Paginate 25 rows default

@@ -3,11 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Enums\SaleOrderStatus;
+use App\Filament\Exports\SalesSummaryExporter;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
-use App\Models\SaleOrderItem;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -61,40 +62,43 @@ class SalesSummary extends Page implements HasTable
     {
         return $table
             ->query(
-                SaleOrderItem::query()
+                // Grouped on products.id so the record key is the product: rows can be resolved/exported by key.
+                Product::withTrashed()
+                    ->with(['brand', 'categories'])
+                    ->join('sale_order_items', 'sale_order_items.product_id', '=', 'products.id')
                     ->join('sale_orders', 'sale_orders.id', '=', 'sale_order_items.sale_order_id')
-                    ->join('products', 'products.id', '=', 'sale_order_items.product_id')
                     ->whereIn('sale_orders.status', [
                         SaleOrderStatus::Confirmed,
                         SaleOrderStatus::Shipped,
                         SaleOrderStatus::Picked,
                         SaleOrderStatus::Fulfilled,
                     ])
+                    ->select('products.*')
                     ->selectRaw('
-                        sale_order_items.product_id as id,
-                        sale_order_items.product_id,
                         SUM(sale_order_items.quantity) as qty_sold,
                         AVG(sale_order_items.unit_price) as avg_unit_price,
                         SUM(sale_order_items.quantity * sale_order_items.unit_price) as total_revenue,
                         SUM(sale_order_items.quantity * products.cost) as total_cost
                     ')
-                    ->groupBy('sale_order_items.product_id')
+                    ->groupBy('products.id')
             )
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(SalesSummaryExporter::class),
+            ])
             ->columns([
                 TextColumn::make('product_name')
                     ->label('Product')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)->name ?? '—')
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%"));
-                    }),
+                    ->state(fn (Product $record): string => $record->name)
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where('products.name', 'like', "%{$search}%")),
 
                 TextColumn::make('brand_name')
                     ->label('Brand')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->brand->name ?? '—'),
+                    ->state(fn (Product $record): string => $record->brand->name ?? '—'),
 
                 TextColumn::make('category_name')
                     ->label('Category')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->categories?->first()->name ?? '—'),
+                    ->state(fn (Product $record): string => $record->categories->first()->name ?? '—'),
 
                 TextColumn::make('qty_sold')
                     ->label('Qty Sold')
@@ -120,14 +124,14 @@ class SalesSummary extends Page implements HasTable
 
                 TextColumn::make('gross_margin')
                     ->label('Gross Margin')
-                    ->state(fn (SaleOrderItem $record): string => number_format(
+                    ->state(fn (Product $record): string => number_format(
                         (float) $record->getAttribute('total_revenue') - (float) $record->getAttribute('total_cost'), 2
                     ))
                     ->money('USD'),
 
                 TextColumn::make('margin_pct')
                     ->label('Margin %')
-                    ->state(function (SaleOrderItem $record): string {
+                    ->state(function (Product $record): string {
                         $revenue = (float) $record->getAttribute('total_revenue');
                         if ($revenue <= 0) {
                             return '0.0%';
@@ -136,7 +140,7 @@ class SalesSummary extends Page implements HasTable
 
                         return number_format(($margin / $revenue) * 100, 1).'%';
                     })
-                    ->color(function (SaleOrderItem $record): string {
+                    ->color(function (Product $record): string {
                         $revenue = (float) $record->getAttribute('total_revenue');
                         if ($revenue <= 0) {
                             return 'gray';
@@ -192,7 +196,7 @@ class SalesSummary extends Page implements HasTable
                             return $query;
                         }
 
-                        return $query->where('sale_order_items.product_id', $data['value']);
+                        return $query->where('products.id', $data['value']);
                     }),
 
                 SelectFilter::make('customer_id')
@@ -218,11 +222,7 @@ class SalesSummary extends Page implements HasTable
                             return $query;
                         }
 
-                        return $query->whereIn('sale_order_items.product_id',
-                            Product::query()
-                                ->whereHas('categories', fn ($c) => $c->where('categories.id', $data['value']))
-                                ->pluck('id')
-                        );
+                        return $query->whereHas('categories', fn (Builder $c) => $c->where('categories.id', $data['value']));
                     }),
             ])
             ->defaultSort('total_revenue', 'desc');

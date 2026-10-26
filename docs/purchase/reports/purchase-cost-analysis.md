@@ -23,60 +23,43 @@ Tracks purchase costs over time by product and supplier. Identifies cost trends,
 
 | Column | Source | Notes |
 |---|---|---|
-| Product | products.name | searchable |
+| Product | products.name | searchable, sortable |
 | Supplier | suppliers.name via purchase_order | |
 | PO # | purchase_orders.order_number | linked to ViewPurchaseOrder |
-| Ordered Date | purchase_orders.ordered_at | date format |
-| Unit Cost | purchase_order_items.unit_cost | numeric(3) |
+| Ordered Date | purchase_orders.ordered_at | date format, sortable |
+| Unit Cost | purchase_order_items.unit_cost | numeric(3), sortable |
 | Quantity | purchase_order_items.quantity | numeric(3) |
-| Total Cost | unit_cost x quantity | numeric(2), computed |
+| Total Cost | unit_cost x quantity | numeric(2), computed, sortable (`ORDER BY unit_cost * quantity`) |
 | Cost Trend | compared to previous PO for same product+supplier | icon: up (danger) / down (success) / flat (gray) |
 
 ## Default Sort
 
-Ordered Date DESC (newest first).
+`purchase_order_items.id` DESC (newest lines first).
 
 ## Data Source
 
 ```php
 PurchaseOrderItem::query()
-    ->with([
-        'purchaseOrder.supplier',
-        'product',
-    ])
-    ->whereHas('purchaseOrder', function ($q) use ($dateFrom, $dateUntil, $supplierId) {
-        $q->whereIn('status', [
-            PurchaseOrderStatus::Confirmed,
-            PurchaseOrderStatus::Received,
-        ]);
-        if ($dateFrom) $q->where('ordered_at', '>=', $dateFrom);
-        if ($dateUntil) $q->where('ordered_at', '<=', $dateUntil);
-        if ($supplierId) $q->where('supplier_id', $supplierId);
-    })
-    ->when($productId, fn ($q) => $q->where('product_id', $productId))
+    ->with(['purchaseOrder.supplier', 'product'])
+    ->select('purchase_order_items.*')
+    ->selectSub(previousUnitCostSubquery(), 'previous_unit_cost')
+    ->whereHas('purchaseOrder', fn ($q) => $q->whereIn('status', [Confirmed, Received]))
+// filters: date range / supplier → whereHas('purchaseOrder'), product → product_id
 ```
 
 ## Cost Trend Logic
 
-For each row, compare `unit_cost` with the previous PO item for the same product + supplier:
+`previous_unit_cost` is a correlated subquery in the table query. It holds the `unit_cost` of the latest earlier PO line (by `purchase_order_id` DESC) for the same product and the same supplier, where that PO is Confirmed/Received, not soft-deleted, and has `ordered_at` before the row's PO.
 
-```php
-// Using a window function or subquery:
-$previousCost = PurchaseOrderItem::query()
-    ->where('product_id', $item->product_id)
-    ->whereHas('purchaseOrder', fn ($q) => $q
-        ->where('supplier_id', $item->purchaseOrder->supplier_id)
-        ->where('ordered_at', '<', $item->purchaseOrder->ordered_at))
-    ->orderByDesc('purchase_order_id')
-    ->value('unit_cost');
+`PurchaseCostAnalysis::costTrend(PurchaseOrderItem $record)` returns `up` when the current cost is higher than the previous one, `down` when it is lower, and `flat` when they are equal or there is no previous PO. The table and the exporter both use it.
 
-// Trend: up if current > previous, down if current < previous, flat if equal or no previous
-```
+The page used to run one lookup query per row. That is gone.
 
-For performance, batch this with a self-join or `LAG()` window function if the database supports it.
+## Export
+
+Header `ExportAction` → `App\Filament\Exports\PurchaseCostAnalysisExporter` (model `PurchaseOrderItem`). Columns: Product, Supplier, PO #, Ordered Date, Unit Cost, Quantity, Total Cost, Previous Unit Cost, Trend. The export uses the table's filtered and sorted query.
 
 ## Performance
 
-- Single query with eager loading
-- Cost trend can be computed via a subquery or post-processed in PHP
+- One table query with the previous-cost subquery, plus eager loads (PO, supplier, product). The query count stays the same however many rows are shown (covered by a `countQueries` test).
 - Paginate 25 rows default

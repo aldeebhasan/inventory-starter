@@ -3,16 +3,18 @@
 namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Enums\MovementType;
-use Aldeebhasan\Inventorix\Facades\Inventorix;
 use Aldeebhasan\Inventorix\Models\Movement;
 use Aldeebhasan\Inventorix\Models\Stock;
 use Aldeebhasan\Inventorix\Models\Threshold;
+use App\Filament\Exports\ReorderSuggestionsExporter;
 use App\Filament\Resources\PurchaseOrders\Pages\CreatePurchaseOrder;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
+use App\Models\Supplier;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -22,12 +24,15 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use UnitEnum;
 
 class ReorderSuggestions extends Page implements HasTable
 {
     use InteractsWithTable;
+
+    /** Consumption velocity window, in days. */
+    public const VELOCITY_DAYS = 30;
 
     protected string $view = 'filament.pages.reorder-suggestions';
 
@@ -51,110 +56,166 @@ class ReorderSuggestions extends Page implements HasTable
         return 'Low-stock products with suggested reorder quantities based on consumption velocity and thresholds.';
     }
 
-    /** @var Collection<string, Movement>|null */
-    protected ?Collection $velocityCache = null;
-
-    /** @var Collection<string, Threshold>|null */
-    protected ?Collection $thresholdCache = null;
-
-    protected function getVelocities(): Collection
+    /**
+     * Thresholds that apply to the outer stock row: location-specific or global (null location).
+     *
+     * @return Builder<Threshold>
+     */
+    protected static function matchingThresholds(): Builder
     {
-        if ($this->velocityCache !== null) {
-            return $this->velocityCache;
-        }
+        $stocks = (new Stock)->getTable();
+        $thresholds = (new Threshold)->getTable();
 
-        $this->velocityCache = Movement::query()
-            ->where('type', MovementType::Deduct)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->selectRaw('stockable_id, location_id, SUM(quantity) as total_deducted')
-            ->groupBy('stockable_id', 'location_id')
-            ->get()
-            ->keyBy(fn ($m) => $m->stockable_id.'-'.$m->location_id);
-
-        return $this->velocityCache;
+        return Threshold::query()
+            ->whereColumn("{$thresholds}.stockable_type", "{$stocks}.stockable_type")
+            ->whereColumn("{$thresholds}.stockable_id", "{$stocks}.stockable_id")
+            ->where(fn (Builder $q) => $q
+                ->whereColumn("{$thresholds}.location_id", "{$stocks}.location_id")
+                ->orWhereNull("{$thresholds}.location_id"));
     }
 
-    protected function getThresholds(): Collection
+    /**
+     * The applicable threshold's column, preferring the location-specific threshold over the global one.
+     *
+     * @return Builder<Threshold>
+     */
+    protected static function thresholdValue(string $column): Builder
     {
-        if ($this->thresholdCache !== null) {
-            return $this->thresholdCache;
-        }
+        $thresholds = (new Threshold)->getTable();
 
-        $this->thresholdCache = Threshold::query()
-            ->where('stockable_type', Product::class)
-            ->get()
-            ->keyBy(fn ($t) => $t->stockable_id.'-'.($t->location_id ?? 'global'));
-
-        return $this->thresholdCache;
+        return static::matchingThresholds()
+            ->select("{$thresholds}.{$column}")
+            ->orderByRaw("{$thresholds}.location_id IS NULL")
+            ->limit(1);
     }
 
-    protected function getThresholdFor(Stock $record): ?Threshold
+    /**
+     * Aggregate over the outer stock row's deduct movements in the velocity window.
+     *
+     * @return Builder<Movement>
+     */
+    protected static function recentDeductions(string $aggregateSql): Builder
     {
-        $thresholds = $this->getThresholds();
+        $stocks = (new Stock)->getTable();
+        $movements = (new Movement)->getTable();
 
-        return $thresholds->get($record->stockable_id.'-'.$record->location_id)
-            ?? $thresholds->get($record->stockable_id.'-global');
+        return Movement::query()
+            ->selectRaw($aggregateSql)
+            ->whereColumn("{$movements}.stockable_type", "{$stocks}.stockable_type")
+            ->whereColumn("{$movements}.stockable_id", "{$stocks}.stockable_id")
+            ->whereColumn("{$movements}.location_id", "{$stocks}.location_id")
+            ->where("{$movements}.type", MovementType::Deduct)
+            ->where("{$movements}.created_at", '>=', now()->subDays(self::VELOCITY_DAYS));
     }
 
-    protected function getProduct(Stock $record): ?Product
+    /**
+     * Days of stock remaining = available / (deducted in window / window days); NULL when nothing was consumed.
+     * Same definition as getDaysUntilStockout(), evaluated in SQL so the urgency filter can use it.
+     *
+     * @return Builder<Movement>
+     */
+    protected static function daysOfStockSubquery(): Builder
     {
-        return $record->stockable instanceof Product ? $record->stockable : null;
+        $stocks = (new Stock)->getTable();
+        $movements = (new Movement)->getTable();
+
+        return static::recentDeductions(
+            "({$stocks}.quantity - {$stocks}.reserved_quantity) * ".self::VELOCITY_DAYS." / NULLIF(SUM({$movements}.quantity), 0)"
+        );
     }
 
-    protected function getVelocityFor(Stock $record): ?object
+    /**
+     * Keep rows with fewer than $days days of stock left; rows with no consumption (infinite days) are excluded.
+     */
+    protected static function whereDaysOfStockBelow(Builder $query, int $days): Builder
     {
-        return $this->getVelocities()->get($record->stockable_id.'-'.$record->location_id);
+        $daysOfStock = static::daysOfStockSubquery();
+
+        return $query->whereRaw("({$daysOfStock->toSql()}) < ?", [...$daysOfStock->getBindings(), $days]);
     }
 
-    protected function getAvgDailyConsumption(Stock $record): float
+    /**
+     * @return Builder<Stock>
+     */
+    protected static function baseQuery(): Builder
     {
-        $velocity = $this->getVelocityFor($record);
-        if (! $velocity || $velocity->total_deducted <= 0) {
-            return 0;
-        }
+        $stocks = (new Stock)->getTable();
+        $thresholds = (new Threshold)->getTable();
+        $movements = (new Movement)->getTable();
 
-        return $velocity->total_deducted / 30;
+        // Same low-stock rule as Inventorix::lowStockItems(), but kept in SQL instead of loading every low-stock ID.
+        return Stock::query()
+            // morphWith instead of 'stockable.suppliers': nested morph paths can't be serialized for queued exports.
+            ->with([
+                'stockable' => fn (MorphTo $morphTo) => $morphTo->morphWith([Product::class => ['suppliers']]),
+                'location',
+            ])
+            ->where("{$stocks}.stockable_type", Product::class)
+            ->whereExists(static::matchingThresholds()->whereColumn("{$stocks}.quantity", '<=', "{$thresholds}.min_quantity"))
+            ->select("{$stocks}.*")
+            ->selectSub(static::thresholdValue('min_quantity'), 'min_quantity')
+            ->selectSub(static::thresholdValue('max_quantity'), 'max_quantity')
+            ->selectSub(static::recentDeductions("SUM({$movements}.quantity)"), 'total_deducted');
     }
 
-    protected function getDaysUntilStockout(Stock $record): ?float
+    public static function getAvailable(Stock $record): float
     {
-        $avgDaily = $this->getAvgDailyConsumption($record);
-        if ($avgDaily <= 0) {
-            return null;
-        }
-
-        $available = $record->quantity - $record->reserved_quantity;
-
-        return $available / $avgDaily;
+        return (float) $record->quantity - (float) $record->reserved_quantity;
     }
 
-    protected function getSuggestedQty(Stock $record): int
+    public static function getAvgDailyConsumption(Stock $record): float
     {
-        $threshold = $this->getThresholdFor($record);
-        $available = $record->quantity - $record->reserved_quantity;
-        $avgDaily = $this->getAvgDailyConsumption($record);
+        $deducted = (float) $record->getAttribute('total_deducted');
 
-        if ($threshold?->max_quantity) {
-            $suggested = (float) $threshold->max_quantity - $available;
-        } else {
-            $suggested = ceil($avgDaily * 30);
-        }
+        return $deducted <= 0 ? 0 : $deducted / self::VELOCITY_DAYS;
+    }
 
-        $minDeficit = $threshold?->min_quantity ? (float) $threshold->min_quantity - $available : 0;
+    public static function getDaysUntilStockout(Stock $record): ?float
+    {
+        $avgDaily = static::getAvgDailyConsumption($record);
+
+        return $avgDaily <= 0 ? null : static::getAvailable($record) / $avgDaily;
+    }
+
+    public static function getSuggestedQty(Stock $record): int
+    {
+        $available = static::getAvailable($record);
+        $min = $record->getAttribute('min_quantity');
+        $max = $record->getAttribute('max_quantity');
+
+        $suggested = $max !== null
+            ? (float) $max - $available
+            : ceil(static::getAvgDailyConsumption($record) * self::VELOCITY_DAYS);
+
+        $minDeficit = $min !== null ? (float) $min - $available : 0;
 
         return (int) max($suggested, $minDeficit, 0);
     }
 
+    public static function getPreferredSupplier(Stock $record): ?Supplier
+    {
+        $product = $record->stockable instanceof Product ? $record->stockable : null;
+
+        return $product?->suppliers->first();
+    }
+
+    public static function getUnitCost(Stock $record): float
+    {
+        $product = $record->stockable instanceof Product ? $record->stockable : null;
+
+        return (float) (static::getPreferredSupplier($record)?->getAttribute('pivot')->unit_cost ?? $product->cost ?? 0);
+    }
+
     public function table(Table $table): Table
     {
-        $lowStockIds = Inventorix::lowStockItems(stockableType: Product::class)->pluck('id');
+        $stocks = (new Stock)->getTable();
 
         return $table
-            ->query(
-                Stock::query()
-                    ->with(['stockable.brand', 'stockable.suppliers', 'location'])
-                    ->whereIn('id', $lowStockIds)
-            )
+            ->query(static::baseQuery())
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(ReorderSuggestionsExporter::class),
+            ])
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -165,7 +226,10 @@ class ReorderSuggestions extends Page implements HasTable
                             fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
                         );
                     })
-                    ->sortable(),
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Product::withTrashed()->select('name')->whereColumn('products.id', "{$stocks}.stockable_id"),
+                        $direction
+                    )),
 
                 TextColumn::make('location.name')
                     ->label('Location')
@@ -174,61 +238,41 @@ class ReorderSuggestions extends Page implements HasTable
                 TextColumn::make('available')
                     ->label('Available')
                     ->numeric(decimalPlaces: 2)
-                    ->state(fn (Stock $record): float => $record->quantity - $record->reserved_quantity),
+                    ->state(fn (Stock $record): float => static::getAvailable($record)),
 
                 TextColumn::make('min_threshold')
                     ->label('Min Threshold')
-                    ->state(function (Stock $record): string {
-                        $threshold = $this->getThresholdFor($record);
-
-                        return $threshold?->min_quantity !== null ? number_format((float) $threshold->min_quantity, 2) : '—';
-                    }),
+                    ->state(fn (Stock $record): string => $record->getAttribute('min_quantity') !== null
+                        ? number_format((float) $record->getAttribute('min_quantity'), 2)
+                        : '—'),
 
                 TextColumn::make('avg_daily')
                     ->label('Avg Daily Consumption')
-                    ->state(fn (Stock $record): string => number_format($this->getAvgDailyConsumption($record), 2)),
+                    ->state(fn (Stock $record): string => number_format(static::getAvgDailyConsumption($record), 2)),
 
                 TextColumn::make('days_until_stockout')
                     ->label('Days Until Stockout')
                     ->state(function (Stock $record): string {
-                        $days = $this->getDaysUntilStockout($record);
+                        $days = static::getDaysUntilStockout($record);
 
                         return $days === null ? '∞' : (string) (int) $days;
                     }),
 
                 TextColumn::make('suggested_qty')
                     ->label('Suggested Reorder Qty')
-                    ->state(fn (Stock $record): string => (string) $this->getSuggestedQty($record)),
+                    ->state(fn (Stock $record): string => (string) static::getSuggestedQty($record)),
 
                 TextColumn::make('preferred_supplier')
                     ->label('Preferred Supplier')
-                    ->state(function (Stock $record): string {
-                        $product = $this->getProduct($record);
-                        $supplier = $product?->suppliers?->first();
-
-                        return $supplier->name ?? '—';
-                    }),
+                    ->state(fn (Stock $record): string => static::getPreferredSupplier($record)->name ?? '—'),
 
                 TextColumn::make('supplier_cost')
                     ->label('Supplier Unit Cost')
-                    ->state(function (Stock $record): string {
-                        $product = $this->getProduct($record);
-                        $supplier = $product?->suppliers?->first();
-                        $cost = $supplier?->getAttribute('pivot')->unit_cost ?? $product->cost ?? 0;
-
-                        return number_format((float) $cost, 3);
-                    }),
+                    ->state(fn (Stock $record): string => number_format(static::getUnitCost($record), 3)),
 
                 TextColumn::make('est_cost')
                     ->label('Est. Reorder Cost')
-                    ->state(function (Stock $record): string {
-                        $product = $this->getProduct($record);
-                        $supplier = $product?->suppliers?->first();
-                        $unitCost = $supplier?->getAttribute('pivot')->unit_cost ?? $product->cost ?? 0;
-                        $qty = $this->getSuggestedQty($record);
-
-                        return number_format($qty * (float) $unitCost, 2);
-                    }),
+                    ->state(fn (Stock $record): string => number_format(static::getSuggestedQty($record) * static::getUnitCost($record), 2)),
             ])
             ->filters([
                 SelectFilter::make('location_id')
@@ -260,7 +304,11 @@ class ReorderSuggestions extends Page implements HasTable
                         'all' => 'All low stock',
                     ])
                     ->default('all')
-                    ->query(fn (Builder $query, array $data): Builder => $query),
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'critical' => static::whereDaysOfStockBelow($query, 7),
+                        'warning' => static::whereDaysOfStockBelow($query, 14),
+                        default => $query,
+                    }),
             ])
             ->recordActions([
                 Action::make('create_purchase_order')
@@ -268,7 +316,7 @@ class ReorderSuggestions extends Page implements HasTable
                     ->icon(Heroicon::OutlinedShoppingCart)
                     ->url(fn (Stock $record): string => CreatePurchaseOrder::getUrl([
                         'product_id' => $record->stockable_id,
-                        'supplier_id' => $this->getProduct($record)?->suppliers->first()?->id,
+                        'supplier_id' => static::getPreferredSupplier($record)?->id,
                     ])),
             ])
             ->defaultSort('quantity', 'asc');

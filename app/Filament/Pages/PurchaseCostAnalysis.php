@@ -3,11 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Filament\Exports\PurchaseCostAnalysisExporter;
 use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -20,7 +22,9 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class PurchaseCostAnalysis extends Page implements HasTable
@@ -49,40 +53,43 @@ class PurchaseCostAnalysis extends Page implements HasTable
         return 'Track unit costs across purchase orders and suppliers, with trend indicators showing price changes over time.';
     }
 
-    /** @var Collection<string, float>|null */
-    protected ?Collection $previousCostCache = null;
-
-    protected function getPreviousCosts(): Collection
+    /**
+     * Correlated lookup of the unit cost on the previous confirmed/received PO for the same product and supplier
+     * (ordered before the row's PO), so the trend needs no per-row query.
+     */
+    protected static function previousUnitCostSubquery(): QueryBuilder
     {
-        if ($this->previousCostCache !== null) {
-            return $this->previousCostCache;
-        }
-
-        $this->previousCostCache = collect();
-
-        return $this->previousCostCache;
+        return DB::table('purchase_order_items as prev_items')
+            ->join('purchase_orders as prev_orders', 'prev_orders.id', '=', 'prev_items.purchase_order_id')
+            ->join('purchase_orders as cur_orders', function (JoinClause $join): void {
+                $join->on('cur_orders.supplier_id', '=', 'prev_orders.supplier_id')
+                    ->on('prev_orders.ordered_at', '<', 'cur_orders.ordered_at');
+            })
+            ->whereColumn('cur_orders.id', 'purchase_order_items.purchase_order_id')
+            ->whereColumn('prev_items.product_id', 'purchase_order_items.product_id')
+            ->whereIn('prev_orders.status', [PurchaseOrderStatus::Confirmed, PurchaseOrderStatus::Received])
+            ->whereNull('prev_orders.deleted_at')
+            ->orderByDesc('prev_items.purchase_order_id')
+            ->limit(1)
+            ->select('prev_items.unit_cost');
     }
 
-    protected function getPreviousCostFor(PurchaseOrderItem $item): ?float
+    /**
+     * 'up', 'down' or 'flat' versus the previous unit cost from the same supplier.
+     */
+    public static function costTrend(PurchaseOrderItem $record): string
     {
-        $key = $item->product_id.'-'.($item->purchaseOrder->supplier_id ?? 0);
-        $cache = $this->getPreviousCosts();
+        $previous = $record->getAttribute('previous_unit_cost');
 
-        if (! $cache->has($key)) {
-            $previousCost = PurchaseOrderItem::query()
-                ->where('product_id', $item->product_id)
-                ->whereHas('purchaseOrder', fn (Builder $q) => $q
-                    ->where('supplier_id', $item->purchaseOrder->supplier_id)
-                    ->where('ordered_at', '<', $item->purchaseOrder->ordered_at)
-                    ->whereIn('status', [PurchaseOrderStatus::Confirmed, PurchaseOrderStatus::Received])
-                )
-                ->orderByDesc('purchase_order_id')
-                ->value('unit_cost');
-
-            $cache->put($key, $previousCost);
+        if ($previous === null) {
+            return 'flat';
         }
 
-        return $cache->get($key);
+        return match ($record->unit_cost <=> (float) $previous) {
+            1 => 'up',
+            -1 => 'down',
+            default => 'flat',
+        };
     }
 
     public function table(Table $table): Table
@@ -91,6 +98,8 @@ class PurchaseCostAnalysis extends Page implements HasTable
             ->query(
                 PurchaseOrderItem::query()
                     ->with(['purchaseOrder.supplier', 'product'])
+                    ->select('purchase_order_items.*')
+                    ->selectSub(self::previousUnitCostSubquery(), 'previous_unit_cost')
                     ->whereHas('purchaseOrder', fn (Builder $q) => $q
                         ->whereIn('status', [
                             PurchaseOrderStatus::Confirmed,
@@ -98,6 +107,10 @@ class PurchaseCostAnalysis extends Page implements HasTable
                         ])
                     )
             )
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(PurchaseCostAnalysisExporter::class),
+            ])
             ->columns([
                 TextColumn::make('product.name')
                     ->label('Product')
@@ -133,21 +146,7 @@ class PurchaseCostAnalysis extends Page implements HasTable
 
                 IconColumn::make('cost_trend')
                     ->label('Trend')
-                    ->state(function (PurchaseOrderItem $record): string {
-                        $previous = $this->getPreviousCostFor($record);
-                        if ($previous === null) {
-                            return 'flat';
-                        }
-
-                        if ($record->unit_cost > $previous) {
-                            return 'up';
-                        }
-                        if ($record->unit_cost < $previous) {
-                            return 'down';
-                        }
-
-                        return 'flat';
-                    })
+                    ->state(fn (PurchaseOrderItem $record): string => self::costTrend($record))
                     ->icon(fn (string $state): Heroicon => match ($state) {
                         'up' => Heroicon::ArrowUp,
                         'down' => Heroicon::ArrowDown,
