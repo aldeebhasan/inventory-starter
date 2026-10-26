@@ -8,9 +8,7 @@ use Aldeebhasan\Inventorix\Facades\Inventorix;
 use Aldeebhasan\Inventorix\Models\Transaction;
 use App\Enums\ReturnOrderStatus;
 use App\Models\ReturnOrder;
-use App\Models\SaleOrderItem;
 use Filament\Actions\Action;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -30,24 +28,20 @@ class CompleteRefundedOrderAction extends Action
             ->requiresConfirmation()
             ->action(function (ReturnOrder $record) {
                 DB::transaction(function () use ($record) {
-                    $saleOrderItems = $this->loadSaleOrderItems($record);
-
                     $baseDto = new StockOperationDto(
                         transactionType: TransactionType::Sale,
                         causable: $record,
                         note: "CRT #{$record->order_number}: refund stock return",
                         createdBy: Auth::id(),
                     );
-                    Inventorix::bulk(function (Transaction $tx) use ($record, $saleOrderItems) {
+                    Inventorix::bulk(function (Transaction $tx) use ($record) {
                         foreach ($record->items as $item) {
-                            $saleItem = $saleOrderItems?->firstWhere('product_id', $item->product_id);
-                            $cost = $saleItem->unit_price ?? $item->product->cost;
-
                             $dto = new StockOperationDto(
                                 transaction: $tx,
                                 causable: $record,
                                 reference: $item,
-                                cost: $cost,
+                                // Returned goods go back at what they cost us, not at the price they were sold for.
+                                cost: $item->product->cost,
                                 note: "CRT #{$record->order_number}: refund stock return",
                                 createdBy: Auth::id(),
                             );
@@ -59,17 +53,5 @@ class CompleteRefundedOrderAction extends Action
                     $record->update(['status' => ReturnOrderStatus::Completed]);
                 });
             });
-    }
-
-    /** @return Collection<int, SaleOrderItem>|null */
-    private function loadSaleOrderItems(ReturnOrder $record): ?Collection
-    {
-        if (! $record->sale_order_id) {
-            return null;
-        }
-
-        return SaleOrderItem::query()
-            ->where('sale_order_id', $record->sale_order_id)
-            ->get();
     }
 }

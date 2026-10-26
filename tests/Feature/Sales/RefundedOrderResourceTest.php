@@ -1,5 +1,6 @@
 <?php
 
+use Aldeebhasan\Inventorix\Models\Movement;
 use App\Enums\ReturnOrderStatus;
 use App\Enums\ReturnOrderType;
 use App\Filament\Resources\RefundedOrders\Pages\CreateRefundedOrder;
@@ -355,7 +356,7 @@ it('can create a return on the fly with product price', function () {
     ]);
 });
 
-it('uses sale order item price as cost when completing a return from sale order', function () {
+it('uses product cost, not the sale price, when completing a return from sale order', function () {
     $product = Product::factory()->create(['cost' => 20.0, 'price' => 50.0]);
     $product->addStock(10, $this->location->id);
 
@@ -377,7 +378,7 @@ it('uses sale order item price as cost when completing a return from sale order'
         'sale_order_id' => $saleOrder->id,
         'status' => ReturnOrderStatus::Draft,
     ]);
-    ReturnOrderItem::factory()->create([
+    $returnItem = ReturnOrderItem::factory()->create([
         'return_order_id' => $return->id,
         'product_id' => $product->id,
         'quantity' => 3,
@@ -389,6 +390,7 @@ it('uses sale order item price as cost when completing a return from sale order'
 
     expect($return->fresh()->status)->toBe(ReturnOrderStatus::Completed);
     expect($product->totalStock($this->location))->toBe(13.0);
+    expect(returnMovementCost($returnItem))->toBe(20.0);
 });
 
 it('uses product cost when completing a return on the fly', function () {
@@ -401,7 +403,7 @@ it('uses product cost when completing a return on the fly', function () {
         'location_id' => $this->location->id,
         'status' => ReturnOrderStatus::Draft,
     ]);
-    ReturnOrderItem::factory()->create([
+    $returnItem = ReturnOrderItem::factory()->create([
         'return_order_id' => $return->id,
         'product_id' => $product->id,
         'quantity' => 3,
@@ -413,4 +415,13 @@ it('uses product cost when completing a return on the fly', function () {
 
     expect($return->fresh()->status)->toBe(ReturnOrderStatus::Completed);
     expect($product->totalStock($this->location))->toBe(13.0);
+    expect(returnMovementCost($returnItem))->toBe(20.0);
 });
+
+function returnMovementCost(ReturnOrderItem $item): float
+{
+    return (float) Movement::query()
+        ->where('reference_type', $item->getMorphClass())
+        ->where('reference_id', $item->id)
+        ->value('cost_per_unit');
+}

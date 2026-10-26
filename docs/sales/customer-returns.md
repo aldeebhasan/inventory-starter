@@ -1,32 +1,32 @@
-# Customer Returns
+# Refunded Orders (Customer Returns)
 
-**Navigation Group:** Sales
+**Navigation Group:** Sales (sort 3)
 **Purpose:** Customer sends goods back to the warehouse -- stock is added back via `addStock()`.
-**References:** Sale Orders via `saleOrder()` belongsTo (`sale_order_id` FK).
+**References:** Sale Orders via `saleOrder()` belongsTo (`sale_order_id` FK, nullable). A sale order lists its refunds via `SaleOrder::refunds()` / `latestRefund()` -- see `docs/sales/sale-orders.md`.
 **Shared model:** `ReturnOrder` with `type = customer_return` -- scoped at the resource level.
 **Status Tracking:** Uses `TracksStatus` trait on `ReturnOrder` -- see `docs/status-tracking.md`.
 
 ## Creation Modes
 
-A customer return can be started in two ways:
+A refunded order can be started in two ways:
 
-1. **From a Sale Order** -- initiated from a specific sale order. Items are limited to the products in that sale order. The item price defaults to the sale order item's unit price. When stock is added back, the cost used is the sale order item's unit cost.
-2. **On the fly** -- created independently without a sale order. Any product can be added. The item price defaults to the product's current price. When stock is added back, the cost used is the product's cost.
+1. **From a Sale Order** -- via the "Create Refund" header action on `ViewSaleOrder` (visible on Shipped/Fulfilled orders). It opens the create page with `sale_order_id` and `customer_id` pre-filled from the query string. Items are limited to the products in that sale order; price and unit default to the sale order item's.
+2. **On the fly** -- created independently without a sale order. Any product can be added. The item price defaults to the product's current price.
 
 ### Item Fields
 
 | Field | Type | Notes |
 |---|---|---|
 | product_id | Select | required. If linked to a sale order, limited to that order's products |
-| unit_id | Select | locked to sale order item's unit when linked; free selection on the fly |
-| quantity | Numeric | required. Max capped to sale order item quantity when linked |
-| price | Numeric | the return price per unit. Defaults to sale order item price (if from order) or product price (if on the fly) |
+| quantity | Numeric | required, min 0.001. Max capped to the sale order item quantity when linked |
+| unit_id | Select | locked (disabled, still saved) to the sale order item's unit when linked; otherwise the product's unit and its derived units |
+| price | Numeric | nullable. Defaults to sale order item `unit_price` (if linked) or product `price` (on the fly) |
 
 ### Inventory Cost on Completion
 
-When the return is completed and stock is added back:
-- **From Sale Order:** the `cost` passed to `addStock()` is the sale order item's `unit_cost`.
-- **On the fly:** the `cost` passed to `addStock()` is the product's cost (fallback).
+When the refund is completed and stock is added back, the `cost` passed to `addStock()` is always the product's `cost` -- in both creation modes. Returned goods are valued at what they cost, never at the price they were sold for (the sale price would inflate inventory valuation). Sale order items carry no cost of their own, and the sale's fulfilment movement does not record one either.
+
+Non-inventory products (`! $product->isInventory()`) are skipped -- no stock is added or reversed for them.
 
 ## State Machine
 
@@ -34,121 +34,77 @@ When the return is completed and stock is added back:
 Draft --[Complete]--> Completed --[Cancel]--> Cancelled
   └──[Cancel]--> Cancelled
 
-Complete: addStock() per item (TransactionType::Sale), cost = sale order item cost or product cost
-Cancel from Completed: deductStock() per item (TransactionType::Reversal) -- reverses the stock addition
+Complete: addStock() per inventory item inside Inventorix::bulk() (TransactionType::Sale)
+Cancel from Completed: deductStock() per inventory item (TransactionType::Reversal) -- reverses the stock addition
 Cancel from Draft: no inventory reversal needed
 ```
 
 ## Models
 
-Uses the shared `ReturnOrder` / `ReturnOrderItem` models -- see `docs/purchase/supplier-returns.md` for the full model definition.
+**`ReturnOrder`** -- `HasFactory`, `SoftDeletes`, `TracksStatus`
+- Columns: `order_number`, `type`, `status`, `sale_order_id`, `customer_id`, `supplier_id`, `location_id`, `reason`, `notes`, `created_by`
+- Casts: `type => ReturnOrderType`, `status => ReturnOrderStatus`
+- Order number generated on `creating`: `CRT-XXXXX` for customer returns (`SRT-XXXXX` for supplier returns), sequential per type including trashed
+- Relationships: `saleOrder()`, `customer()`, `supplier()`, `location()`, `items()`, `createdBy()`, `statusLogs()` (from TracksStatus)
 
-The `CustomerReturnResource` scopes all queries to `type = customer_return`:
-```php
-public static function getEloquentQuery(): Builder
-{
-    return parent::getEloquentQuery()->where('type', ReturnOrderType::CustomerReturn);
-}
-```
+**`ReturnOrderItem`** -- columns `return_order_id`, `product_id`, `unit_id`, `quantity`, `price`; relationships `returnOrder()`, `product()`, `unit()`
 
-And auto-sets the type on create:
-```php
-protected function mutateFormDataBeforeCreate(array $data): array
-{
-    $data['type'] = ReturnOrderType::CustomerReturn->value;
-    return $data;
-}
-```
+`ReturnOrderStatus` enum: `Draft` (gray), `Completed` (success), `Cancelled` (danger).
 
 ## Filament Resource
 
-**Path:** `app/Filament/Resources/CustomerReturns/`
+**Path:** `app/Filament/Resources/RefundedOrders/` -- `RefundedOrderResource`, slug `refunded-orders`
 **Icon:** `Heroicon::OutlinedArrowUturnLeft`
 
-### Form (`Schemas/CustomerReturnForm.php`)
+The resource scopes all queries to `type = customer_return` (soft-deleted records included so they can be restored):
+```php
+public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->where('type', ReturnOrderType::CustomerReturn)
+        ->withoutGlobalScopes([SoftDeletingScope::class]);
+}
+```
+
+`CreateRefundedOrder::mutateFormDataBeforeCreate()` sets `type = customer_return` and `created_by = auth()->id()`.
+
+### Form (`Schemas/RefundedOrderForm.php`)
 
 | Field | Type | Notes |
 |---|---|---|
-| order_number | TextInput | auto-generated CRT-XXXXX, unique |
+| order_number | TextInput | disabled, generated by the model on create |
 | customer_id | Select | relationship('customer', 'name'), searchable, required |
-| sale_order_id | Select | from SaleOrders, nullable, label 'Original Sale Order'. When changed, resets items and auto-selects customer |
-| location_id | Select | relationship('location', 'name'), required |
+| sale_order_id | Select | label 'Original Sale Order', nullable, live. On change: clears items and auto-selects the order's customer |
+| location_id | Select | label 'Warehouse', required |
 | reason | TextInput | required |
 | notes | Textarea | nullable |
-| items | Repeater | relationship() -- product_id (span 2, options filtered by sale order if linked), quantity (span 1), price (span 1, defaults per creation mode) |
+| items | Repeater | relationship(), min 1 -- see Item Fields above |
 
-### Table (`Tables/CustomerReturnsTable.php`)
+### Table (`Tables/RefundedOrdersTable.php`)
 
 | Column | Notes |
 |---|---|
 | order_number | sortable, searchable |
 | customer.name | sortable |
-| status | badge |
+| status | badge with color per status |
 | created_at | date, sortable |
 
-Filters: `SelectFilter` on status, `TrashedFilter`
+Filters: `SelectFilter` on status, `TrashedFilter`. Row actions: View; Edit and Delete only on Draft.
 
-Pages: `ListCustomerReturns`, `CreateCustomerReturn`, `ViewCustomerReturn`, `EditCustomerReturn` (Draft only)
+### Pages
 
-### Workflow Actions (header actions on `ViewCustomerReturn`)
+- `ListRefundedOrders` -- Create header action
+- `CreateRefundedOrder` -- pre-fills `sale_order_id` / `customer_id` from the query string
+- `ViewRefundedOrder` -- workflow header actions (below); infolist has "Return Details", "Lines", and "Status History" sections
+- `EditRefundedOrder` -- Draft only (aborts 403 otherwise)
 
-**CompleteAction** -- `Draft -> Completed` + add stock back
-```php
-Action::make('complete')
-    ->visible(fn (ReturnOrder $record) => $record->status === ReturnOrderStatus::Draft)
-    ->requiresConfirmation()
-    ->action(function (ReturnOrder $record) {
-        DB::transaction(function () use ($record) {
-            Inventorix::bulk(function (Transaction $tx) use ($record) {
-                foreach ($record->items as $item) {
-                    // Use sale order item cost if available, otherwise product cost
-                    $cost = $item->saleOrderItem?->unit_cost ?? $item->product->cost;
+### Workflow Actions (header actions on `ViewRefundedOrder`)
 
-                    $dto = new StockOperationDto(
-                        transaction: $tx,
-                        transactionType: TransactionType::Sale,
-                        causable: $record,
-                        reference: $item,
-                        cost: $cost,
-                        createdBy: auth()->id(),
-                    );
-                    $item->product->addStock($item->quantity, $record->location_id, $dto);
-                }
-            });
-            $record->update(['status' => ReturnOrderStatus::Completed]);
-        });
-    })
-```
+| Action | Class | Visible on | Effect |
+|---|---|---|---|
+| Complete | `Actions/CompleteRefundedOrderAction` | Draft | `Inventorix::bulk()` → `addStock()` per inventory item (causable = order, reference = item, cost = product cost), then status → Completed |
+| Cancel | `Actions/CancelRefundedOrderAction` | Draft, Completed | Requires a reason. If Completed: `deductStock()` per inventory item (`TransactionType::Reversal`, causable = order, reference = item, cost = product cost). Logs the status change with the reason, then status → Cancelled |
 
-**CancelAction** -- `Draft|Completed -> Cancelled` + reverse inventory if needed
-```php
-Action::make('cancel')
-    ->visible(fn (ReturnOrder $record) => in_array($record->status, [
-        ReturnOrderStatus::Draft, ReturnOrderStatus::Completed,
-    ]))
-    ->color('danger')
-    ->requiresConfirmation()
-    ->schema([
-        Textarea::make('reason')->label('Cancellation Reason'),
-    ])
-    ->action(function (ReturnOrder $record, array $data) {
-        DB::transaction(function () use ($record, $data) {
-            if ($record->status === ReturnOrderStatus::Completed) {
-                // Reverse the stock addition
-                foreach ($record->items as $item) {
-                    $dto = new StockOperationDto(
-                        transactionType: TransactionType::Reversal,
-                        causable: $item, // line item as causable for idempotency
-                        reference: $record,
-                        note: "Cancel CRT #{$record->order_number}",
-                        createdBy: auth()->id(),
-                    );
-                    $item->product->deductStock($item->quantity, $record->location_id, $dto);
-                }
-            }
+## Testing
 
-            $record->logStatusChange($record->status, ReturnOrderStatus::Cancelled, reason: $data['reason'] ?? null);
-            $record->updateQuietly(['status' => ReturnOrderStatus::Cancelled]);
-        });
-    })
-```
+`tests/Feature/Sales/RefundedOrderResourceTest.php` -- list (excludes supplier returns, status filter, soft delete), create (CRT prefix, required fields, from sale order vs on the fly pricing), view page, complete adds stock at product cost in both creation modes (asserted on the movement's `cost_per_unit`), cancel from Draft and Completed (stock reversal, reason logged), and guard conditions (no edit after Draft, hidden actions per status).
