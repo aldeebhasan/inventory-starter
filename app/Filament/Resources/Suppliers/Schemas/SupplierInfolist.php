@@ -44,7 +44,7 @@ class SupplierInfolist
                                         return '—';
                                     }
 
-                                    return Unit::find($state)?->abbreviation ?? '—';
+                                    return Unit::find($state)->abbreviation ?? '—';
                                 }),
                         ]),
                 ]),

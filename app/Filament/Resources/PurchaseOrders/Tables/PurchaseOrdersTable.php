@@ -43,7 +43,9 @@ class PurchaseOrdersTable
                 SelectFilter::make('status')
                     ->options(PurchaseOrderStatus::class),
                 SelectFilter::make('supplier_id')
-                    ->relationship('supplier', 'name'),
+                    ->relationship('supplier', 'name')
+                    ->searchable()
+                    ->preload(false),
                 TrashedFilter::make(),
             ])
             ->recordActions([

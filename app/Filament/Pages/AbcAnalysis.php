@@ -46,7 +46,7 @@ class AbcAnalysis extends Page implements HasTable
         return 'Classify products by consumption value — A items (top 80%), B (next 15%), C (remaining 5%) — to focus inventory control efforts.';
     }
 
-    /** @var Collection<int, array{consumption_qty: float, consumption_value: float, cumulative_pct: float, abc_class: string}>|null */
+    /** @var Collection<int|string, array{consumption_qty: float, consumption_value: float, avg_cost: float, cumulative_pct: float|int, abc_class: string}>|null */
     protected ?Collection $abcCache = null;
 
     protected function getDateFrom(): string
@@ -94,12 +94,12 @@ class AbcAnalysis extends Page implements HasTable
 
         $items = $consumption->map(function ($row) use ($products) {
             $product = $products->get($row->stockable_id);
-            $cost = (float) ($product?->cost ?? 0);
+            $cost = (float) ($product->cost ?? 0);
 
             return [
                 'product_id' => $row->stockable_id,
-                'consumption_qty' => (float) $row->total_qty,
-                'consumption_value' => (float) $row->total_qty * $cost,
+                'consumption_qty' => (float) $row->getAttribute('total_qty'),
+                'consumption_value' => (float) $row->getAttribute('total_qty') * $cost,
                 'avg_cost' => $cost,
             ];
         })->sortByDesc('consumption_value')->values();
@@ -225,14 +225,16 @@ class AbcAnalysis extends Page implements HasTable
 
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name)
                     ->query(fn (Builder $query, array $data): Builder => $query),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(fn (Builder $query, array $data): Builder => $query),
             ])
             ->paginated([25, 50, 100]);

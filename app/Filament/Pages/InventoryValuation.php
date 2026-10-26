@@ -59,7 +59,7 @@ class InventoryValuation extends Page implements HasTable
             ->sum(function (Stock $stock) {
                 $available = $stock->quantity - $stock->reserved_quantity;
 
-                return $available * ($stock->stockable?->cost ?? 0);
+                return $available * ($stock->stockable?->getAttribute('cost') ?? 0);
             });
 
         return $table
@@ -87,7 +87,7 @@ class InventoryValuation extends Page implements HasTable
 
                 TextColumn::make('category')
                     ->label('Category')
-                    ->state(fn (Stock $record): string => $record->stockable?->categories?->first()?->name ?? '—'),
+                    ->state(fn (Stock $record): string => $record->stockable?->getAttribute('categories')?->first()->name ?? '—'),
 
                 TextColumn::make('location.name')
                     ->label('Location')
@@ -105,14 +105,14 @@ class InventoryValuation extends Page implements HasTable
 
                 TextColumn::make('avg_cost')
                     ->label('Avg Cost/Unit')
-                    ->state(fn (Stock $record): string => number_format($record->stockable?->cost ?? 0, 2)),
+                    ->state(fn (Stock $record): string => number_format($record->stockable?->getAttribute('cost') ?? 0, 2)),
 
                 TextColumn::make('total_value')
                     ->label('Total Value')
                     ->state(function (Stock $record): string {
                         $available = $record->quantity - $record->reserved_quantity;
 
-                        return number_format($available * ($record->stockable?->cost ?? 0), 2);
+                        return number_format($available * ($record->stockable?->getAttribute('cost') ?? 0), 2);
                     })
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw('((quantity - reserved_quantity) * (SELECT cost FROM products WHERE products.id = inventorix_stocks.stockable_id)) '.$direction);
@@ -126,7 +126,7 @@ class InventoryValuation extends Page implements HasTable
                         }
 
                         $available = $record->quantity - $record->reserved_quantity;
-                        $value = $available * ($record->stockable?->cost ?? 0);
+                        $value = $available * ($record->stockable?->getAttribute('cost') ?? 0);
 
                         return number_format(($value / $grandTotal) * 100, 2).'%';
                     }),
@@ -134,13 +134,15 @@ class InventoryValuation extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -153,8 +155,9 @@ class InventoryValuation extends Page implements HasTable
 
                 SelectFilter::make('brand')
                     ->label('Brand')
-                    ->options(fn () => Brand::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Brand::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Brand::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

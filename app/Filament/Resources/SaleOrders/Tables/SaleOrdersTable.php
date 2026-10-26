@@ -43,7 +43,9 @@ class SaleOrdersTable
                 SelectFilter::make('status')
                     ->options(SaleOrderStatus::class),
                 SelectFilter::make('customer_id')
-                    ->relationship('customer', 'name'),
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(false),
                 TrashedFilter::make(),
             ])
             ->recordActions([

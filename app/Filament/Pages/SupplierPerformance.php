@@ -97,43 +97,43 @@ class SupplierPerformance extends Page implements HasTable
                 TextColumn::make('fulfillment_rate')
                     ->label('Fulfillment Rate')
                     ->state(function (Supplier $record): string {
-                        $total = (int) $record->total_pos;
+                        $total = (int) $record->getAttribute('total_pos');
                         if ($total === 0) {
                             return '0.0%';
                         }
 
-                        return number_format(((int) $record->received_pos / $total) * 100, 1).'%';
+                        return number_format(((int) $record->getAttribute('received_pos') / $total) * 100, 1).'%';
                     }),
 
                 TextColumn::make('avg_lead_time')
                     ->label('Avg Lead Time')
                     ->state(function (Supplier $record): string {
-                        if ($record->avg_lead_time === null) {
+                        if ($record->getAttribute('avg_lead_time') === null) {
                             return '—';
                         }
 
-                        return number_format((float) $record->avg_lead_time, 1).' days';
+                        return number_format((float) $record->getAttribute('avg_lead_time'), 1).' days';
                     }),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
-                    ->state(fn (Supplier $record): string => number_format((float) ($record->total_items ?? 0), 0)),
+                    ->state(fn (Supplier $record): string => number_format((float) ($record->getAttribute('total_items') ?? 0), 0)),
 
                 TextColumn::make('total_spend')
                     ->label('Total Spend')
-                    ->state(fn (Supplier $record): string => number_format((float) ($record->total_spend ?? 0), 2))
+                    ->state(fn (Supplier $record): string => number_format((float) ($record->getAttribute('total_spend') ?? 0), 2))
                     ->money('USD')
                     ->sortable(),
 
                 TextColumn::make('avg_unit_cost')
                     ->label('Avg Unit Cost')
                     ->state(function (Supplier $record): string {
-                        $items = (float) ($record->total_items ?? 0);
+                        $items = (float) ($record->getAttribute('total_items') ?? 0);
                         if ($items <= 0) {
                             return '—';
                         }
 
-                        return number_format((float) $record->total_spend / $items, 3);
+                        return number_format((float) $record->getAttribute('total_spend') / $items, 3);
                     }),
             ])
             ->filters([
@@ -164,8 +164,9 @@ class SupplierPerformance extends Page implements HasTable
 
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->options(fn () => Supplier::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Supplier::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Supplier::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

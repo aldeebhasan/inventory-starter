@@ -49,7 +49,7 @@ class ReorderSuggestions extends Page implements HasTable
         return 'Low-stock products with suggested reorder quantities based on consumption velocity and thresholds.';
     }
 
-    /** @var Collection<string, object>|null */
+    /** @var Collection<string, Movement>|null */
     protected ?Collection $velocityCache = null;
 
     /** @var Collection<string, Threshold>|null */
@@ -92,6 +92,11 @@ class ReorderSuggestions extends Page implements HasTable
 
         return $thresholds->get($record->stockable_id.'-'.$record->location_id)
             ?? $thresholds->get($record->stockable_id.'-global');
+    }
+
+    protected function getProduct(Stock $record): ?Product
+    {
+        return $record->stockable instanceof Product ? $record->stockable : null;
     }
 
     protected function getVelocityFor(Stock $record): ?object
@@ -196,18 +201,18 @@ class ReorderSuggestions extends Page implements HasTable
                 TextColumn::make('preferred_supplier')
                     ->label('Preferred Supplier')
                     ->state(function (Stock $record): string {
-                        $product = $record->stockable;
+                        $product = $this->getProduct($record);
                         $supplier = $product?->suppliers?->first();
 
-                        return $supplier?->name ?? '—';
+                        return $supplier->name ?? '—';
                     }),
 
                 TextColumn::make('supplier_cost')
                     ->label('Supplier Unit Cost')
                     ->state(function (Stock $record): string {
-                        $product = $record->stockable;
+                        $product = $this->getProduct($record);
                         $supplier = $product?->suppliers?->first();
-                        $cost = $supplier?->pivot?->unit_cost ?? $product?->cost ?? 0;
+                        $cost = $supplier?->getAttribute('pivot')->unit_cost ?? $product->cost ?? 0;
 
                         return number_format((float) $cost, 3);
                     }),
@@ -215,9 +220,9 @@ class ReorderSuggestions extends Page implements HasTable
                 TextColumn::make('est_cost')
                     ->label('Est. Reorder Cost')
                     ->state(function (Stock $record): string {
-                        $product = $record->stockable;
+                        $product = $this->getProduct($record);
                         $supplier = $product?->suppliers?->first();
-                        $unitCost = $supplier?->pivot?->unit_cost ?? $product?->cost ?? 0;
+                        $unitCost = $supplier?->getAttribute('pivot')->unit_cost ?? $product->cost ?? 0;
                         $qty = $this->getSuggestedQty($record);
 
                         return number_format($qty * (float) $unitCost, 2);
@@ -226,13 +231,15 @@ class ReorderSuggestions extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -259,7 +266,7 @@ class ReorderSuggestions extends Page implements HasTable
                     ->icon(Heroicon::OutlinedShoppingCart)
                     ->url(fn (Stock $record): string => CreatePurchaseOrder::getUrl([
                         'product_id' => $record->stockable_id,
-                        'supplier_id' => $record->stockable?->suppliers?->first()?->id,
+                        'supplier_id' => $this->getProduct($record)?->suppliers->first()?->id,
                     ])),
             ])
             ->defaultSort('quantity', 'asc');

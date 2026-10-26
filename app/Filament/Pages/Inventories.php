@@ -72,7 +72,7 @@ class Inventories extends Page implements HasTable
 
                 TextColumn::make('stockable.categories')
                     ->label('Categories')
-                    ->state(fn (Stock $record): string => $record->stockable?->categories?->pluck('name')->join(', ') ?: '—')
+                    ->state(fn (Stock $record): string => $record->stockable?->getAttribute('categories')?->pluck('name')->join(', ') ?: '—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('location.name')
@@ -98,7 +98,7 @@ class Inventories extends Page implements HasTable
                     ->label('Valuation')
                     ->state(function (Stock $record): string {
                         $available = $record->quantity - $record->reserved_quantity;
-                        $cost = $record->stockable?->cost ?? 0;
+                        $cost = $record->stockable?->getAttribute('cost') ?? 0;
 
                         return number_format($available * $cost, 2);
                     })
@@ -161,13 +161,15 @@ class Inventories extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('stockable_id')
                     ->label('Product')
-                    ->options(fn () => Product::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Product::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Product::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -179,8 +181,9 @@ class Inventories extends Page implements HasTable
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

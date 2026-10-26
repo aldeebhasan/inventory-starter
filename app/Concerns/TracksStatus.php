@@ -15,13 +15,13 @@ trait TracksStatus
 {
     public static function bootTracksStatus(): void
     {
-        static::created(function (Model $model) {
-            if ($model->status !== null) {
+        static::created(function (self $model) {
+            if ($model->getAttribute('status') !== null) {
                 $model->logStatusChange(null, $model->status);
             }
         });
 
-        static::updating(function (Model $model) {
+        static::updating(function (self $model) {
             if ($model->isDirty('status')) {
                 $model->logStatusChange(
                     $model->getOriginal('status'),

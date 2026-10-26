@@ -48,7 +48,7 @@ class CustomerReturnsAnalysis extends Page implements HasTable
         return 'Return volumes and rates per product — identify quality issues or problematic SKUs.';
     }
 
-    /** @var Collection<int, object>|null */
+    /** @var Collection<int|string, SaleOrderItem>|null */
     protected ?Collection $salesCache = null;
 
     protected function getDateFrom(): ?string
@@ -107,7 +107,7 @@ class CustomerReturnsAnalysis extends Page implements HasTable
             ->columns([
                 TextColumn::make('product_name')
                     ->label('Product')
-                    ->state(fn (ReturnOrderItem $record): string => Product::find($record->product_id)?->name ?? '—')
+                    ->state(fn (ReturnOrderItem $record): string => Product::find($record->product_id)->name ?? '—')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereIn('return_order_items.product_id',
                             Product::where('name', 'like', "%{$search}%")->pluck('id')
@@ -124,7 +124,7 @@ class CustomerReturnsAnalysis extends Page implements HasTable
                     ->state(function (ReturnOrderItem $record): string {
                         $sales = $this->getSalesAggregates()->get($record->product_id);
 
-                        return number_format((float) ($sales?->qty_sold ?? 0), 3);
+                        return number_format((float) ($sales?->getAttribute('qty_sold') ?? 0), 3);
                     }),
 
                 TextColumn::make('return_rate')
@@ -132,23 +132,23 @@ class CustomerReturnsAnalysis extends Page implements HasTable
                     ->badge()
                     ->state(function (ReturnOrderItem $record): string {
                         $sales = $this->getSalesAggregates()->get($record->product_id);
-                        $qtySold = (float) ($sales?->qty_sold ?? 0);
+                        $qtySold = (float) ($sales?->getAttribute('qty_sold') ?? 0);
 
                         if ($qtySold <= 0) {
                             return '—';
                         }
 
-                        return number_format(((float) $record->qty_returned / $qtySold) * 100, 1).'%';
+                        return number_format(((float) $record->getAttribute('qty_returned') / $qtySold) * 100, 1).'%';
                     })
                     ->color(function (ReturnOrderItem $record): string {
                         $sales = $this->getSalesAggregates()->get($record->product_id);
-                        $qtySold = (float) ($sales?->qty_sold ?? 0);
+                        $qtySold = (float) ($sales?->getAttribute('qty_sold') ?? 0);
 
                         if ($qtySold <= 0) {
                             return 'gray';
                         }
 
-                        $rate = ((float) $record->qty_returned / $qtySold) * 100;
+                        $rate = ((float) $record->getAttribute('qty_returned') / $qtySold) * 100;
 
                         return $rate > 10 ? 'danger' : 'gray';
                     }),
@@ -185,8 +185,9 @@ class CustomerReturnsAnalysis extends Page implements HasTable
 
                 SelectFilter::make('customer_id')
                     ->label('Customer')
-                    ->options(fn () => Customer::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Customer::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Customer::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -197,8 +198,9 @@ class CustomerReturnsAnalysis extends Page implements HasTable
 
                 SelectFilter::make('product_id')
                     ->label('Product')
-                    ->options(fn () => Product::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Product::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Product::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

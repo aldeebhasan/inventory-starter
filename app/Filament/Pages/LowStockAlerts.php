@@ -164,13 +164,15 @@ class LowStockAlerts extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

@@ -46,10 +46,10 @@ class StockVelocityReport extends Page implements HasTable
         return 'How fast each product is consumed and how many days of stock remain at current usage rates.';
     }
 
-    /** @var Collection<string, object>|null */
+    /** @var Collection<string, Movement>|null */
     protected ?Collection $velocityCache = null;
 
-    /** @var Collection<string, object>|null */
+    /** @var Collection<int, Movement>|null */
     protected ?Collection $peakCache = null;
 
     protected function getPeriod(): int
@@ -99,7 +99,7 @@ class StockVelocityReport extends Page implements HasTable
         return $this->getVelocities()->get($record->stockable_id.'-'.$record->location_id);
     }
 
-    protected function getPeakFor(Stock $record): ?object
+    protected function getPeakFor(Stock $record): ?Movement
     {
         return $this->getPeaks()->first(fn ($m) => $m->stockable_id == $record->stockable_id && $m->location_id == $record->location_id);
     }
@@ -176,7 +176,7 @@ class StockVelocityReport extends Page implements HasTable
                     ->state(function (Stock $record): string {
                         $peak = $this->getPeakFor($record);
 
-                        return $peak?->demand_date ?? '—';
+                        return $peak?->getAttribute('demand_date') ?? '—';
                     }),
 
                 TextColumn::make('velocity_status')
@@ -220,13 +220,15 @@ class StockVelocityReport extends Page implements HasTable
             ->filters([
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

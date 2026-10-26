@@ -107,9 +107,7 @@ class PurchaseCostAnalysis extends Page implements HasTable
 
                 TextColumn::make('purchaseOrder.order_number')
                     ->label('PO #')
-                    ->url(fn (PurchaseOrderItem $record) => $record->purchaseOrder
-                        ? PurchaseOrderResource::getUrl('view', ['record' => $record->purchase_order_id])
-                        : null),
+                    ->url(fn (PurchaseOrderItem $record) => PurchaseOrderResource::getUrl('view', ['record' => $record->purchase_order_id])),
 
                 TextColumn::make('purchaseOrder.ordered_at')
                     ->label('Ordered Date')
@@ -187,8 +185,9 @@ class PurchaseCostAnalysis extends Page implements HasTable
 
                 SelectFilter::make('product_id')
                     ->label('Product')
-                    ->options(fn () => Product::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Product::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Product::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -199,8 +198,9 @@ class PurchaseCostAnalysis extends Page implements HasTable
 
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->options(fn () => Supplier::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Supplier::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Supplier::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

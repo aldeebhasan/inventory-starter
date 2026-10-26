@@ -41,7 +41,7 @@ class CompleteRefundedOrderAction extends Action
                     Inventorix::bulk(function (Transaction $tx) use ($record, $saleOrderItems) {
                         foreach ($record->items as $item) {
                             $saleItem = $saleOrderItems?->firstWhere('product_id', $item->product_id);
-                            $cost = $saleItem?->unit_price ?? $item->product->cost;
+                            $cost = $saleItem->unit_price ?? $item->product->cost;
 
                             $dto = new StockOperationDto(
                                 transaction: $tx,
@@ -61,6 +61,7 @@ class CompleteRefundedOrderAction extends Action
             });
     }
 
+    /** @return Collection<int, SaleOrderItem>|null */
     private function loadSaleOrderItems(ReturnOrder $record): ?Collection
     {
         if (! $record->sale_order_id) {

@@ -48,10 +48,10 @@ class ProductMovementSummary extends Page implements HasTable
         return 'Aggregated stock additions and deductions per product over a date range, with net change and turnover rate.';
     }
 
-    /** @var Collection<int, object>|null */
+    /** @var Collection<int|string, Movement>|null */
     protected ?Collection $movementCache = null;
 
-    /** @var Collection<int, Stock>|null */
+    /** @var Collection<int|string, Stock>|null */
     protected ?Collection $stockCache = null;
 
     protected function getDateFrom(): string
@@ -137,14 +137,14 @@ class ProductMovementSummary extends Page implements HasTable
 
                 TextColumn::make('category')
                     ->label('Category')
-                    ->state(fn (Product $record): string => $record->categories->first()?->name ?? '—'),
+                    ->state(fn (Product $record): string => $record->categories->first()->name ?? '—'),
 
                 TextColumn::make('total_added')
                     ->label('Total Added')
                     ->state(function (Product $record): string {
                         $agg = $this->getMovementAggregates()->get($record->id);
 
-                        return number_format((float) ($agg?->total_added ?? 0), 3);
+                        return number_format((float) ($agg?->getAttribute('total_added') ?? 0), 3);
                     }),
 
                 TextColumn::make('total_deducted')
@@ -152,7 +152,7 @@ class ProductMovementSummary extends Page implements HasTable
                     ->state(function (Product $record): string {
                         $agg = $this->getMovementAggregates()->get($record->id);
 
-                        return number_format((float) ($agg?->total_deducted ?? 0), 3);
+                        return number_format((float) ($agg?->getAttribute('total_deducted') ?? 0), 3);
                     }),
 
                 TextColumn::make('net_change')
@@ -160,15 +160,15 @@ class ProductMovementSummary extends Page implements HasTable
                     ->badge()
                     ->state(function (Product $record): string {
                         $agg = $this->getMovementAggregates()->get($record->id);
-                        $added = (float) ($agg?->total_added ?? 0);
-                        $deducted = (float) ($agg?->total_deducted ?? 0);
+                        $added = (float) ($agg?->getAttribute('total_added') ?? 0);
+                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
 
                         return number_format($added - $deducted, 3);
                     })
                     ->color(function (Product $record): string {
                         $agg = $this->getMovementAggregates()->get($record->id);
-                        $added = (float) ($agg?->total_added ?? 0);
-                        $deducted = (float) ($agg?->total_deducted ?? 0);
+                        $added = (float) ($agg?->getAttribute('total_added') ?? 0);
+                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
                         $net = $added - $deducted;
 
                         if ($net > 0) {
@@ -186,16 +186,16 @@ class ProductMovementSummary extends Page implements HasTable
                     ->state(function (Product $record): string {
                         $stock = $this->getCurrentStocks()->get($record->id);
 
-                        return number_format((float) ($stock?->total_qty ?? 0), 2);
+                        return number_format((float) ($stock?->getAttribute('total_qty') ?? 0), 2);
                     }),
 
                 TextColumn::make('turnover_rate')
                     ->label('Turnover Rate')
                     ->state(function (Product $record): string {
                         $agg = $this->getMovementAggregates()->get($record->id);
-                        $deducted = (float) ($agg?->total_deducted ?? 0);
+                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
                         $stock = $this->getCurrentStocks()->get($record->id);
-                        $currentQty = (float) ($stock?->total_qty ?? 0);
+                        $currentQty = (float) ($stock?->getAttribute('total_qty') ?? 0);
 
                         if ($currentQty <= 0) {
                             return '—';
@@ -230,14 +230,16 @@ class ProductMovementSummary extends Page implements HasTable
 
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name)
                     ->query(fn (Builder $query, array $data): Builder => $query),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -248,8 +250,9 @@ class ProductMovementSummary extends Page implements HasTable
 
                 SelectFilter::make('brand')
                     ->label('Brand')
-                    ->options(fn () => Brand::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Brand::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Brand::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

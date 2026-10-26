@@ -47,7 +47,7 @@ class DeadStockReport extends Page implements HasTable
         return 'Products with no deductions for a configurable period — candidates for clearance or write-off.';
     }
 
-    /** @var Collection<string, string|null>|null */
+    /** @var Collection<string, Movement>|null */
     protected ?Collection $lastMovementCache = null;
 
     protected function getMinDaysInactive(): int
@@ -76,7 +76,7 @@ class DeadStockReport extends Page implements HasTable
     {
         return $this->getLastMovementDates()
             ->get($record->stockable_id.'-'.$record->location_id)
-            ?->last_deduct_at;
+            ?->getAttribute('last_deduct_at');
     }
 
     public function table(Table $table): Table
@@ -143,7 +143,7 @@ class DeadStockReport extends Page implements HasTable
                 TextColumn::make('stock_value')
                     ->label('Stock Value')
                     ->state(function (Stock $record): string {
-                        $cost = (float) ($record->stockable?->cost ?? 0);
+                        $cost = (float) ($record->stockable?->getAttribute('cost') ?? 0);
 
                         return number_format($record->quantity * $cost, 2);
                     })
@@ -164,13 +164,15 @@ class DeadStockReport extends Page implements HasTable
 
                 SelectFilter::make('location_id')
                     ->label('Location')
-                    ->options(fn () => Location::query()->where('is_active', true)->pluck('name', 'id'))
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name),
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -183,8 +185,9 @@ class DeadStockReport extends Page implements HasTable
 
                 SelectFilter::make('brand')
                     ->label('Brand')
-                    ->options(fn () => Brand::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Brand::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Brand::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;

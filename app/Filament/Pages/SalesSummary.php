@@ -63,8 +63,10 @@ class SalesSummary extends Page implements HasTable
                     ->join('sale_orders', 'sale_orders.id', '=', 'sale_order_items.sale_order_id')
                     ->join('products', 'products.id', '=', 'sale_order_items.product_id')
                     ->whereIn('sale_orders.status', [
+                        SaleOrderStatus::Confirmed,
                         SaleOrderStatus::Shipped,
                         SaleOrderStatus::Picked,
+                        SaleOrderStatus::Fulfilled,
                     ])
                     ->selectRaw('
                         sale_order_items.product_id as id,
@@ -79,18 +81,18 @@ class SalesSummary extends Page implements HasTable
             ->columns([
                 TextColumn::make('product_name')
                     ->label('Product')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->name ?? '—')
+                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)->name ?? '—')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%"));
                     }),
 
                 TextColumn::make('brand_name')
                     ->label('Brand')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->brand?->name ?? '—'),
+                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->brand->name ?? '—'),
 
                 TextColumn::make('category_name')
                     ->label('Category')
-                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->categories?->first()?->name ?? '—'),
+                    ->state(fn (SaleOrderItem $record): string => Product::find($record->product_id)?->categories?->first()->name ?? '—'),
 
                 TextColumn::make('qty_sold')
                     ->label('Qty Sold')
@@ -117,27 +119,27 @@ class SalesSummary extends Page implements HasTable
                 TextColumn::make('gross_margin')
                     ->label('Gross Margin')
                     ->state(fn (SaleOrderItem $record): string => number_format(
-                        (float) $record->total_revenue - (float) $record->total_cost, 2
+                        (float) $record->getAttribute('total_revenue') - (float) $record->getAttribute('total_cost'), 2
                     ))
                     ->money('USD'),
 
                 TextColumn::make('margin_pct')
                     ->label('Margin %')
                     ->state(function (SaleOrderItem $record): string {
-                        $revenue = (float) $record->total_revenue;
+                        $revenue = (float) $record->getAttribute('total_revenue');
                         if ($revenue <= 0) {
                             return '0.0%';
                         }
-                        $margin = $revenue - (float) $record->total_cost;
+                        $margin = $revenue - (float) $record->getAttribute('total_cost');
 
                         return number_format(($margin / $revenue) * 100, 1).'%';
                     })
                     ->color(function (SaleOrderItem $record): string {
-                        $revenue = (float) $record->total_revenue;
+                        $revenue = (float) $record->getAttribute('total_revenue');
                         if ($revenue <= 0) {
                             return 'gray';
                         }
-                        $pct = (($revenue - (float) $record->total_cost) / $revenue) * 100;
+                        $pct = (($revenue - (float) $record->getAttribute('total_cost')) / $revenue) * 100;
 
                         if ($pct > 20) {
                             return 'success';
@@ -180,8 +182,9 @@ class SalesSummary extends Page implements HasTable
 
                 SelectFilter::make('product_id')
                     ->label('Product')
-                    ->options(fn () => Product::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Product::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Product::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -192,8 +195,9 @@ class SalesSummary extends Page implements HasTable
 
                 SelectFilter::make('customer_id')
                     ->label('Customer')
-                    ->options(fn () => Customer::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Customer::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Customer::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
@@ -204,8 +208,9 @@ class SalesSummary extends Page implements HasTable
 
                 SelectFilter::make('category')
                     ->label('Category')
-                    ->options(fn () => Category::query()->pluck('name', 'id'))
                     ->searchable()
+                    ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
+                    ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(function (Builder $query, array $data): Builder {
                         if (blank($data['value'])) {
                             return $query;
