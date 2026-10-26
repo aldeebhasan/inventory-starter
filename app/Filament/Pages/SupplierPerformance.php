@@ -3,11 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Filament\Exports\SupplierPerformanceExporter;
 use App\Filament\Resources\Suppliers\SupplierResource;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -48,35 +50,56 @@ class SupplierPerformance extends Page implements HasTable
         return 'Compare suppliers by fulfillment rate, lead time, total spend, and order volume.';
     }
 
+    /**
+     * Restrict a purchase_orders query to the active date range so the metrics follow the date filter.
+     *
+     * @template TBuilder of Builder
+     *
+     * @param  TBuilder  $query
+     * @return TBuilder
+     */
+    protected function inDateRange(Builder $query): Builder
+    {
+        $from = $this->tableFilters['date_range']['from'] ?? null;
+        $until = $this->tableFilters['date_range']['until'] ?? null;
+
+        return $query
+            ->when($from, fn (Builder $q) => $q->whereDate('purchase_orders.ordered_at', '>=', $from))
+            ->when($until, fn (Builder $q) => $q->whereDate('purchase_orders.ordered_at', '<=', $until));
+    }
+
     public function table(Table $table): Table
     {
         return $table
-            ->query(
-                Supplier::query()
-                    ->withCount([
-                        'purchaseOrders as total_pos',
-                        'purchaseOrders as received_pos' => fn ($q) => $q->where('status', PurchaseOrderStatus::Received),
-                        'purchaseOrders as cancelled_pos' => fn ($q) => $q->where('status', PurchaseOrderStatus::Cancelled),
-                    ])
-                    ->addSelect([
-                        'total_spend' => PurchaseOrderItem::query()
-                            ->selectRaw('SUM(purchase_order_items.quantity * purchase_order_items.unit_cost)')
-                            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
-                            ->where('purchase_orders.status', PurchaseOrderStatus::Received)
-                            ->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
-                        'total_items' => PurchaseOrderItem::query()
-                            ->selectRaw('SUM(purchase_order_items.quantity)')
-                            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
-                            ->where('purchase_orders.status', PurchaseOrderStatus::Received)
-                            ->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
-                        'avg_lead_time' => PurchaseOrder::query()
-                            ->selectRaw(DB::getDriverName() === 'sqlite'
-                                ? 'AVG(CAST(julianday(updated_at) - julianday(ordered_at) AS INTEGER))'
-                                : 'AVG(DATEDIFF(updated_at, ordered_at))')
-                            ->whereColumn('supplier_id', 'suppliers.id')
-                            ->where('status', PurchaseOrderStatus::Received),
-                    ])
-            )
+            // Closure: evaluated per request so every metric subquery sees the current date filter.
+            ->query(fn (): Builder => Supplier::query()
+                ->withCount([
+                    'purchaseOrders as total_pos' => fn (Builder $q) => $this->inDateRange($q),
+                    'purchaseOrders as received_pos' => fn (Builder $q) => $this->inDateRange($q)->where('status', PurchaseOrderStatus::Received),
+                    'purchaseOrders as cancelled_pos' => fn (Builder $q) => $this->inDateRange($q)->where('status', PurchaseOrderStatus::Cancelled),
+                ])
+                ->addSelect([
+                    'total_spend' => $this->inDateRange(PurchaseOrderItem::query())
+                        ->selectRaw('SUM(purchase_order_items.quantity * purchase_order_items.unit_cost)')
+                        ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
+                        ->where('purchase_orders.status', PurchaseOrderStatus::Received)
+                        ->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
+                    'total_items' => $this->inDateRange(PurchaseOrderItem::query())
+                        ->selectRaw('SUM(purchase_order_items.quantity)')
+                        ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
+                        ->where('purchase_orders.status', PurchaseOrderStatus::Received)
+                        ->whereColumn('purchase_orders.supplier_id', 'suppliers.id'),
+                    'avg_lead_time' => $this->inDateRange(PurchaseOrder::query())
+                        ->selectRaw(DB::getDriverName() === 'sqlite'
+                            ? 'AVG(CAST(julianday(updated_at) - julianday(ordered_at) AS INTEGER))'
+                            : 'AVG(DATEDIFF(updated_at, ordered_at))')
+                        ->whereColumn('supplier_id', 'suppliers.id')
+                        ->where('status', PurchaseOrderStatus::Received),
+                ]))
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(SupplierPerformanceExporter::class),
+            ])
             ->columns([
                 TextColumn::make('name')
                     ->label('Supplier')
