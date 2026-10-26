@@ -39,37 +39,38 @@ ABC class assignment:
 
 ## Default Sort
 
-Consumption Value DESC (highest value first). Sort is fixed — ABC classification requires this order.
+Consumption Value DESC (rank order). Sort is fixed — ABC classification requires this order.
 
 ## Data Source
 
-```php
-// Step 1: Aggregate consumption by product
-$consumption = Movement::query()
-    ->whereHasMorph('stockable', [Product::class])
-    ->where('type', MovementType::Deduct)
-    ->whereBetween('created_at', [$dateFrom, $dateUntil])
-    ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
-    ->selectRaw('stockable_id, SUM(quantity) as total_qty')
-    ->groupBy('stockable_id')
-    ->orderByDesc('total_qty')
-    ->get();
+`AbcAnalysis::computeAbc(array $options)` (static, shared with the exporter; options `from`, `until`, `location_id`, `category`):
 
-// Step 2: Join with products, compute value, calculate cumulative %
-// For each row: consumption_value = total_qty * product.cost
-// Sort by consumption_value DESC
-// Running cumulative sum / grand total → assign class
+```php
+Product::query() // SoftDeletes scope applies
+    ->join('inventorix_movements', /* stockable_id = products.id AND stockable_type = Product */)
+    ->where('inventorix_movements.type', MovementType::Deduct)
+    ->whereBetween('inventorix_movements.created_at', [$from, $until])
+    ->when($locationId, ...)->when($categoryId, fn ($q) => $q->whereHas('categories', ...))
+    ->groupBy('products.id', 'products.cost')
+    ->selectRaw('products.id as product_id, products.cost as cost, SUM(quantity) as total_qty')
+    ->toBase()->get();
 ```
+
+Then in PHP: `consumption_value = total_qty × cost`, sort DESC, running cumulative % → class (A ≤ 80%, B ≤ 95%, else C).
 
 ## Implementation Notes
 
-- ABC classification is computed in PHP after the SQL aggregation, since it requires a running total
-- The table is not a standard Eloquent query — use a custom `getTableQuery()` or build the data in `getTableRecords()`
-- Pagination is optional since this is typically a full-product view, but use it for large catalogs
-- Consider caching the result for the selected period since it's expensive and doesn't change intra-day
+- The cumulative % needs every consumed product's value, so ranking can't be limited to the current page. It is one aggregate query returning plain rows (no product models), cached per request in `$abcCache`.
+- The table query is restricted to the ranked product ids and ordered by rank (`CASE id ...`); columns read values from the cached ranking.
+- The category filter restricts the ranking itself (grand total is over the filtered set).
+
+## Export
+
+Header action `ExportAction` → `App\Filament\Exports\AbcAnalysisExporter` (model `Product`), with the page's current filters passed as options. The exporter runs `computeAbc()` once per export job (cached on the exporter instance) and reads each row's values from it — no per-row queries.
+
+Columns: # (rank), Product, Brand, Consumption Qty, Avg Cost/Unit, Consumption Value, Cumulative %, ABC Class.
 
 ## Performance
 
-- Single aggregation query
-- Classification computed in PHP (running sum)
-- Paginate 50 rows default (users often want to see full ranking)
+- Two data queries per render regardless of page size: the ranking aggregate and the paginated table query.
+- Query count per render is constant (verified by a `countQueries` test); classification is covered by tests.

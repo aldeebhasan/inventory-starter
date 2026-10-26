@@ -5,11 +5,13 @@ namespace App\Filament\Pages;
 use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Models\Movement;
 use Aldeebhasan\Inventorix\Models\Stock;
+use App\Filament\Exports\ProductMovementSummaryExporter;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -21,7 +23,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use UnitEnum;
 
 class ProductMovementSummary extends Page implements HasTable
@@ -50,20 +51,14 @@ class ProductMovementSummary extends Page implements HasTable
         return 'Aggregated stock additions and deductions per product over a date range, with net change and turnover rate.';
     }
 
-    /** @var Collection<int|string, Movement>|null */
-    protected ?Collection $movementCache = null;
-
-    /** @var Collection<int|string, Stock>|null */
-    protected ?Collection $stockCache = null;
-
     protected function getDateFrom(): string
     {
-        return $this->tableFilters['date_range']['from'] ?? now()->subDays(30)->toDateString();
+        return ($this->tableFilters['date_range']['from'] ?? null) ?: now()->subDays(30)->toDateString();
     }
 
     protected function getDateUntil(): string
     {
-        return $this->tableFilters['date_range']['until'] ?? now()->toDateString();
+        return ($this->tableFilters['date_range']['until'] ?? null) ?: now()->toDateString();
     }
 
     protected function getLocationFilter(): ?int
@@ -73,60 +68,65 @@ class ProductMovementSummary extends Page implements HasTable
         return $val ? (int) $val : null;
     }
 
-    protected function getMovementAggregates(): Collection
+    /**
+     * Movements of the outer product row within the date range (and location, if set).
+     *
+     * @return Builder<Movement>
+     */
+    protected static function movementsInRange(string $from, string $until, ?int $locationId): Builder
     {
-        if ($this->movementCache !== null) {
-            return $this->movementCache;
-        }
-
-        $query = Movement::query()
-            ->whereHasMorph('stockable', [Product::class])
-            ->whereBetween('created_at', [$this->getDateFrom().' 00:00:00', $this->getDateUntil().' 23:59:59']);
-
-        $locationId = $this->getLocationFilter();
-        if ($locationId) {
-            $query->where('location_id', $locationId);
-        }
-
-        $this->movementCache = $query
-            ->selectRaw('
-                stockable_id,
-                SUM(CASE WHEN type = ? THEN quantity ELSE 0 END) as total_added,
-                SUM(CASE WHEN type = ? THEN quantity ELSE 0 END) as total_deducted
-            ', [MovementType::Add->value, MovementType::Deduct->value])
-            ->groupBy('stockable_id')
-            ->get()
-            ->keyBy('stockable_id');
-
-        return $this->movementCache;
+        return Movement::query()
+            ->whereColumn('inventorix_movements.stockable_id', 'products.id')
+            ->where('inventorix_movements.stockable_type', Product::class)
+            ->whereBetween('inventorix_movements.created_at', [$from.' 00:00:00', $until.' 23:59:59'])
+            ->when($locationId, fn (Builder $q) => $q->where('inventorix_movements.location_id', $locationId));
     }
 
-    protected function getCurrentStocks(): Collection
+    /**
+     * Products that moved in the range, with `total_added`, `total_deducted` and `current_stock`
+     * selected as correlated subqueries so only the returned rows are aggregated.
+     * Shared with {@see ProductMovementSummaryExporter}.
+     *
+     * @return Builder<Product>
+     */
+    public static function getReportQuery(string $from, string $until, ?int $locationId): Builder
     {
-        if ($this->stockCache !== null) {
-            return $this->stockCache;
-        }
+        $sumOfType = fn (MovementType $type) => static::movementsInRange($from, $until, $locationId)
+            ->where('inventorix_movements.type', $type->value)
+            ->selectRaw('COALESCE(SUM(inventorix_movements.quantity), 0)');
 
-        $this->stockCache = Stock::query()
-            ->whereHasMorph('stockable', [Product::class])
-            ->selectRaw('stockable_id, SUM(quantity) as total_qty')
-            ->groupBy('stockable_id')
-            ->get()
-            ->keyBy('stockable_id');
+        return Product::query()
+            ->select('products.*')
+            ->addSelect([
+                'total_added' => $sumOfType(MovementType::Add),
+                'total_deducted' => $sumOfType(MovementType::Deduct),
+                'current_stock' => Stock::query()
+                    ->whereColumn('inventorix_stocks.stockable_id', 'products.id')
+                    ->where('inventorix_stocks.stockable_type', Product::class)
+                    ->selectRaw('COALESCE(SUM(inventorix_stocks.quantity), 0)'),
+            ])
+            ->with(['brand', 'categories'])
+            ->whereExists(static::movementsInRange($from, $until, $locationId)->toBase());
+    }
 
-        return $this->stockCache;
+    public static function netChange(Product $record): float
+    {
+        return (float) $record->getAttribute('total_added') - (float) $record->getAttribute('total_deducted');
+    }
+
+    public static function turnoverRate(Product $record): string
+    {
+        $currentQty = (float) $record->getAttribute('current_stock');
+
+        return $currentQty > 0
+            ? number_format((float) $record->getAttribute('total_deducted') / $currentQty, 2)
+            : '—';
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->query(
-                Product::query()
-                    ->with(['brand', 'categories'])
-                    ->whereHas('stocks', function ($q) {
-                        // Only products that have movements in the date range
-                    })
-            )
+            ->query(fn (): Builder => static::getReportQuery($this->getDateFrom(), $this->getDateUntil(), $this->getLocationFilter()))
             ->columns([
                 TextColumn::make('name')
                     ->label('Product')
@@ -143,68 +143,29 @@ class ProductMovementSummary extends Page implements HasTable
 
                 TextColumn::make('total_added')
                     ->label('Total Added')
-                    ->state(function (Product $record): string {
-                        $agg = $this->getMovementAggregates()->get($record->id);
-
-                        return number_format((float) ($agg?->getAttribute('total_added') ?? 0), 3);
-                    }),
+                    ->state(fn (Product $record): string => number_format((float) $record->getAttribute('total_added'), 3)),
 
                 TextColumn::make('total_deducted')
                     ->label('Total Deducted')
-                    ->state(function (Product $record): string {
-                        $agg = $this->getMovementAggregates()->get($record->id);
-
-                        return number_format((float) ($agg?->getAttribute('total_deducted') ?? 0), 3);
-                    }),
+                    ->state(fn (Product $record): string => number_format((float) $record->getAttribute('total_deducted'), 3)),
 
                 TextColumn::make('net_change')
                     ->label('Net Change')
                     ->badge()
-                    ->state(function (Product $record): string {
-                        $agg = $this->getMovementAggregates()->get($record->id);
-                        $added = (float) ($agg?->getAttribute('total_added') ?? 0);
-                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
-
-                        return number_format($added - $deducted, 3);
-                    })
-                    ->color(function (Product $record): string {
-                        $agg = $this->getMovementAggregates()->get($record->id);
-                        $added = (float) ($agg?->getAttribute('total_added') ?? 0);
-                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
-                        $net = $added - $deducted;
-
-                        if ($net > 0) {
-                            return 'success';
-                        }
-                        if ($net < 0) {
-                            return 'danger';
-                        }
-
-                        return 'gray';
+                    ->state(fn (Product $record): string => number_format(static::netChange($record), 3))
+                    ->color(fn (Product $record): string => match (true) {
+                        static::netChange($record) > 0 => 'success',
+                        static::netChange($record) < 0 => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('current_stock')
                     ->label('Current Stock')
-                    ->state(function (Product $record): string {
-                        $stock = $this->getCurrentStocks()->get($record->id);
-
-                        return number_format((float) ($stock?->getAttribute('total_qty') ?? 0), 2);
-                    }),
+                    ->state(fn (Product $record): string => number_format((float) $record->getAttribute('current_stock'), 2)),
 
                 TextColumn::make('turnover_rate')
                     ->label('Turnover Rate')
-                    ->state(function (Product $record): string {
-                        $agg = $this->getMovementAggregates()->get($record->id);
-                        $deducted = (float) ($agg?->getAttribute('total_deducted') ?? 0);
-                        $stock = $this->getCurrentStocks()->get($record->id);
-                        $currentQty = (float) ($stock?->getAttribute('total_qty') ?? 0);
-
-                        if ($currentQty <= 0) {
-                            return '—';
-                        }
-
-                        return number_format($deducted / $currentQty, 2);
-                    }),
+                    ->state(fn (Product $record): string => static::turnoverRate($record)),
             ])
             ->filters([
                 Filter::make('date_range')
@@ -217,6 +178,7 @@ class ProductMovementSummary extends Page implements HasTable
                             ->label('Until')
                             ->default(now()),
                     ])
+                    // Applied in getReportQuery() via the table query.
                     ->query(fn (Builder $query, array $data): Builder => $query)
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
@@ -235,6 +197,7 @@ class ProductMovementSummary extends Page implements HasTable
                     ->searchable()
                     ->getSearchResultsUsing(fn (string $search) => Location::query()->where('is_active', true)->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
                     ->getOptionLabelUsing(fn ($value) => Location::find($value)?->name)
+                    // Applied in getReportQuery() via the table query.
                     ->query(fn (Builder $query, array $data): Builder => $query),
 
                 SelectFilter::make('category')
@@ -262,6 +225,10 @@ class ProductMovementSummary extends Page implements HasTable
 
                         return $query->where('brand_id', $data['value']);
                     }),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(ProductMovementSummaryExporter::class),
             ])
             ->defaultSort('name');
     }

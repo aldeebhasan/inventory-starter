@@ -5,12 +5,14 @@ namespace App\Filament\Pages;
 use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Models\Movement;
 use Aldeebhasan\Inventorix\Models\Stock;
+use App\Filament\Exports\DeadStockReportExporter;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
 use Carbon\Carbon;
+use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -20,7 +22,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use UnitEnum;
 
 class DeadStockReport extends Page implements HasTable
@@ -49,57 +50,76 @@ class DeadStockReport extends Page implements HasTable
         return 'Products with no deductions for a configurable period — candidates for clearance or write-off.';
     }
 
-    /** @var Collection<string, Movement>|null */
-    protected ?Collection $lastMovementCache = null;
-
     protected function getMinDaysInactive(): int
     {
         return (int) ($this->tableFilters['min_days_inactive']['value'] ?? 90);
     }
 
-    protected function getLastMovementDates(): Collection
+    /**
+     * Stocks with quantity > 0 and no deductions since the cutoff. `last_deduct_at` (latest
+     * deduction ever, NULL = never) is a correlated subquery, so only returned rows are aggregated.
+     *
+     * @return Builder<Stock>
+     */
+    public static function getReportQuery(int $minDaysInactive): Builder
     {
-        if ($this->lastMovementCache !== null) {
-            return $this->lastMovementCache;
-        }
+        $cutoff = now()->subDays($minDaysInactive)->toDateTimeString();
 
-        $this->lastMovementCache = Movement::query()
+        $deductsForStock = fn () => Movement::query()
+            ->whereColumn('inventorix_movements.stockable_id', 'inventorix_stocks.stockable_id')
+            ->whereColumn('inventorix_movements.stockable_type', 'inventorix_stocks.stockable_type')
+            ->whereColumn('inventorix_movements.location_id', 'inventorix_stocks.location_id')
+            ->where('inventorix_movements.type', MovementType::Deduct->value);
+
+        return Stock::query()
+            ->select('inventorix_stocks.*')
+            ->addSelect([
+                'last_deduct_at' => $deductsForStock()->selectRaw('MAX(inventorix_movements.created_at)'),
+                'brand_name' => static::brandNameSubquery(),
+            ])
+            // Nested eager loads through the stockable morphTo (stockable.brand) can't be serialized
+            // for exports, so the brand name is selected as a subquery instead.
+            ->with(['stockable', 'location'])
             ->whereHasMorph('stockable', [Product::class])
-            ->where('type', MovementType::Deduct)
-            ->selectRaw('stockable_id, location_id, MAX(created_at) as last_deduct_at')
-            ->groupBy('stockable_id', 'location_id')
-            ->get()
-            ->keyBy(fn ($row) => $row->stockable_id.'-'.$row->location_id);
-
-        return $this->lastMovementCache;
+            ->where('quantity', '>', 0)
+            ->whereNotExists($deductsForStock()->where('inventorix_movements.created_at', '>=', $cutoff)->toBase());
     }
 
-    protected function getLastMovementFor(Stock $record): ?string
+    /**
+     * @return Builder<Brand>
+     */
+    public static function brandNameSubquery(): Builder
     {
-        return $this->getLastMovementDates()
-            ->get($record->stockable_id.'-'.$record->location_id)
-            ?->getAttribute('last_deduct_at');
+        return Brand::query()
+            ->select('brands.name')
+            ->join('products', 'products.brand_id', '=', 'brands.id')
+            ->whereColumn('products.id', 'inventorix_stocks.stockable_id')
+            ->limit(1);
+    }
+
+    public static function formatLastMovement(Stock $record): string
+    {
+        $date = $record->getAttribute('last_deduct_at');
+
+        return $date ? Carbon::parse($date)->format('M d, Y') : 'Never';
+    }
+
+    public static function formatDaysInactive(Stock $record): string
+    {
+        $date = $record->getAttribute('last_deduct_at');
+
+        return $date ? (string) (int) Carbon::parse($date)->diffInDays(now()) : '—';
+    }
+
+    public static function stockValue(Stock $record): float
+    {
+        return round((float) $record->quantity * (float) ($record->stockable?->getAttribute('cost') ?? 0), 2);
     }
 
     public function table(Table $table): Table
     {
-        $cutoff = now()->subDays($this->getMinDaysInactive())->toDateTimeString();
-
         return $table
-            ->query(
-                Stock::query()
-                    ->with(['stockable.brand', 'location'])
-                    ->whereHasMorph('stockable', [Product::class])
-                    ->where('quantity', '>', 0)
-                    ->whereNotExists(function ($sub) use ($cutoff) {
-                        $sub->from('inventorix_movements')
-                            ->whereColumn('inventorix_movements.stockable_id', 'inventorix_stocks.stockable_id')
-                            ->whereColumn('inventorix_movements.stockable_type', 'inventorix_stocks.stockable_type')
-                            ->whereColumn('inventorix_movements.location_id', 'inventorix_stocks.location_id')
-                            ->where('inventorix_movements.type', MovementType::Deduct->value)
-                            ->where('inventorix_movements.created_at', '>=', $cutoff);
-                    })
-            )
+            ->query(fn (): Builder => static::getReportQuery($this->getMinDaysInactive()))
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -111,7 +131,7 @@ class DeadStockReport extends Page implements HasTable
                         );
                     }),
 
-                TextColumn::make('stockable.brand.name')
+                TextColumn::make('brand_name')
                     ->label('Brand')
                     ->placeholder('—'),
 
@@ -124,31 +144,19 @@ class DeadStockReport extends Page implements HasTable
 
                 TextColumn::make('last_movement')
                     ->label('Last Movement Date')
-                    ->state(function (Stock $record): string {
-                        $date = $this->getLastMovementFor($record);
-
-                        return $date ? Carbon::parse($date)->format('M d, Y') : 'Never';
-                    }),
+                    ->state(fn (Stock $record): string => static::formatLastMovement($record)),
 
                 TextColumn::make('days_inactive')
                     ->label('Days Since Last Movement')
-                    ->state(function (Stock $record): string {
-                        $date = $this->getLastMovementFor($record);
-                        if (! $date) {
-                            return '—';
-                        }
-
-                        return (string) (int) now()->diffInDays(Carbon::parse($date));
-                    })
-                    ->sortable(query: fn (Builder $query, string $direction) => $query),
+                    ->state(fn (Stock $record): string => static::formatDaysInactive($record))
+                    // More days inactive = older last deduction; never deducted (NULL) is the most inactive.
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                        ->orderByRaw('last_deduct_at IS NULL '.($direction === 'desc' ? 'DESC' : 'ASC'))
+                        ->orderBy('last_deduct_at', $direction === 'desc' ? 'asc' : 'desc')),
 
                 TextColumn::make('stock_value')
                     ->label('Stock Value')
-                    ->state(function (Stock $record): string {
-                        $cost = (float) ($record->stockable?->getAttribute('cost') ?? 0);
-
-                        return number_format($record->quantity * $cost, 2);
-                    })
+                    ->state(fn (Stock $record): float => static::stockValue($record))
                     ->money('USD'),
             ])
             ->filters([
@@ -162,6 +170,7 @@ class DeadStockReport extends Page implements HasTable
                         '365' => '365 days',
                     ])
                     ->default('90')
+                    // Applied in getReportQuery() via the table query.
                     ->query(fn (Builder $query, array $data): Builder => $query),
 
                 SelectFilter::make('location_id')
@@ -199,6 +208,10 @@ class DeadStockReport extends Page implements HasTable
                             fn (Builder $q) => $q->where('brand_id', $data['value'])
                         );
                     }),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(DeadStockReportExporter::class),
             ])
             ->defaultSort('quantity', 'desc');
     }

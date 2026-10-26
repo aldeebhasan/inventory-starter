@@ -3,11 +3,12 @@
 namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Enums\MovementType;
-use Aldeebhasan\Inventorix\Models\Movement;
+use App\Filament\Exports\AbcAnalysisExporter;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -53,63 +54,79 @@ class AbcAnalysis extends Page implements HasTable
 
     protected function getDateFrom(): string
     {
-        return $this->tableFilters['date_range']['from'] ?? now()->subYear()->toDateString();
+        return ($this->tableFilters['date_range']['from'] ?? null) ?: now()->subYear()->toDateString();
     }
 
     protected function getDateUntil(): string
     {
-        return $this->tableFilters['date_range']['until'] ?? now()->toDateString();
+        return ($this->tableFilters['date_range']['until'] ?? null) ?: now()->toDateString();
     }
 
+    /**
+     * Current filter values, also passed to {@see AbcAnalysisExporter} as export options.
+     *
+     * @return array{from: string, until: string, location_id: mixed, category: mixed}
+     */
+    protected function getAbcOptions(): array
+    {
+        return [
+            'from' => $this->getDateFrom(),
+            'until' => $this->getDateUntil(),
+            'location_id' => $this->tableFilters['location_id']['value'] ?? null,
+            'category' => $this->tableFilters['category']['value'] ?? null,
+        ];
+    }
+
+    /**
+     * @return Collection<int, array{consumption_qty: float, consumption_value: float, avg_cost: float, cumulative_pct: float|int, abc_class: string}>
+     */
     protected function getAbcData(): Collection
     {
-        if ($this->abcCache !== null) {
-            return $this->abcCache;
-        }
+        return $this->abcCache ??= static::computeAbc($this->getAbcOptions());
+    }
 
-        $query = Movement::query()
-            ->whereHasMorph('stockable', [Product::class])
-            ->where('type', MovementType::Deduct)
-            ->whereBetween('created_at', [$this->getDateFrom().' 00:00:00', $this->getDateUntil().' 23:59:59']);
+    /**
+     * Rank all consumed products by consumption value. The cumulative % needs every product's
+     * consumption, so this aggregates in one SQL query (one row per consumed product, no models)
+     * and ranks in PHP. Keyed by product id, in rank order.
+     *
+     * @param  array{from?: string|null, until?: string|null, location_id?: mixed, category?: mixed}  $options
+     * @return Collection<int, array{consumption_qty: float, consumption_value: float, avg_cost: float, cumulative_pct: float|int, abc_class: string}>
+     */
+    public static function computeAbc(array $options): Collection
+    {
+        $from = ($options['from'] ?? null) ?: now()->subYear()->toDateString();
+        $until = ($options['until'] ?? null) ?: now()->toDateString();
+        $locationId = $options['location_id'] ?? null;
+        $categoryId = $options['category'] ?? null;
 
-        $locationId = $this->tableFilters['location_id']['value'] ?? null;
-        if ($locationId) {
-            $query->where('location_id', $locationId);
-        }
-
-        $consumption = $query
-            ->selectRaw('stockable_id, SUM(quantity) as total_qty')
-            ->groupBy('stockable_id')
-            ->get();
-
-        $products = Product::whereIn('id', $consumption->pluck('stockable_id'))
+        $items = Product::query()
+            ->join('inventorix_movements', function ($join): void {
+                $join->on('inventorix_movements.stockable_id', '=', 'products.id')
+                    ->where('inventorix_movements.stockable_type', Product::class);
+            })
+            ->where('inventorix_movements.type', MovementType::Deduct->value)
+            ->whereBetween('inventorix_movements.created_at', [$from.' 00:00:00', $until.' 23:59:59'])
+            ->when(filled($locationId), fn (Builder $q) => $q->where('inventorix_movements.location_id', $locationId))
+            ->when(filled($categoryId), fn (Builder $q) => $q->whereHas('categories', fn ($c) => $c->where('categories.id', $categoryId)))
+            ->groupBy('products.id', 'products.cost')
+            ->orderBy('products.id')
+            ->selectRaw('products.id as product_id, products.cost as cost, SUM(inventorix_movements.quantity) as total_qty')
+            ->toBase()
             ->get()
-            ->keyBy('id');
-
-        // Filter by category if set
-        $categoryId = $this->tableFilters['category']['value'] ?? null;
-        if ($categoryId) {
-            $productIdsInCategory = Product::whereHas('categories', fn ($c) => $c->where('categories.id', $categoryId))
-                ->pluck('id');
-            $consumption = $consumption->filter(fn ($row) => $productIdsInCategory->contains($row->stockable_id));
-        }
-
-        $items = $consumption->map(function ($row) use ($products) {
-            $product = $products->get($row->stockable_id);
-            $cost = (float) ($product->cost ?? 0);
-
-            return [
-                'product_id' => $row->stockable_id,
-                'consumption_qty' => (float) $row->getAttribute('total_qty'),
-                'consumption_value' => (float) $row->getAttribute('total_qty') * $cost,
-                'avg_cost' => $cost,
-            ];
-        })->sortByDesc('consumption_value')->values();
+            ->map(fn (object $row): array => [
+                'product_id' => (int) $row->product_id,
+                'consumption_qty' => (float) $row->total_qty,
+                'consumption_value' => (float) $row->total_qty * (float) ($row->cost ?? 0),
+                'avg_cost' => (float) ($row->cost ?? 0),
+            ])
+            ->sortByDesc('consumption_value')
+            ->values();
 
         $grandTotal = $items->sum('consumption_value');
         $runningTotal = 0;
 
-        $this->abcCache = $items->mapWithKeys(function ($item) use ($grandTotal, &$runningTotal) {
+        return $items->mapWithKeys(function (array $item) use ($grandTotal, &$runningTotal): array {
             $runningTotal += $item['consumption_value'];
             $cumulativePct = $grandTotal > 0 ? ($runningTotal / $grandTotal) * 100 : 0;
 
@@ -130,8 +147,6 @@ class AbcAnalysis extends Page implements HasTable
                 ],
             ];
         });
-
-        return $this->abcCache;
     }
 
     public function table(Table $table): Table
@@ -238,6 +253,11 @@ class AbcAnalysis extends Page implements HasTable
                     ->getSearchResultsUsing(fn (string $search) => Category::query()->where('name', 'like', "%{$search}%")->limit(50)->pluck('name', 'id'))
                     ->getOptionLabelUsing(fn ($value) => Category::find($value)?->name)
                     ->query(fn (Builder $query, array $data): Builder => $query),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(AbcAnalysisExporter::class)
+                    ->options(fn (): array => $this->getAbcOptions()),
             ])
             ->paginated([25, 50, 100]);
     }

@@ -31,47 +31,39 @@ Identifies products with stock on hand but zero or near-zero movement over a con
 | Days Since Last Movement | DATEDIFF(now, last_movement) | integer |
 | Stock Value | quantity x product.cost | numeric(2), currency |
 
-## Default Sort
+## Sorting
 
-Days Since Last Movement DESC (longest idle first).
+- Default: Qty On Hand DESC.
+- **Days Since Last Movement** is sortable in SQL: it orders by the `last_deduct_at` subquery (older = more days inactive) and treats never-deducted stock (`NULL`) as the most inactive — first when sorting DESC, last when ASC.
 
 ## Data Source
 
+`DeadStockReport::getReportQuery(int $minDaysInactive)` (static, shared with the exporter):
+
 ```php
-// Stocks with quantity > 0 that have no deduct movements in the threshold period
 Stock::query()
-    ->with(['stockable.brand', 'location'])
+    ->select('inventorix_stocks.*')
+    ->addSelect([
+        // latest deduction ever for this stockable + location (NULL = never)
+        'last_deduct_at' => Movement::query()->whereColumn(...stockable/type/location...)
+            ->where('type', MovementType::Deduct)->selectRaw('MAX(created_at)'),
+        'brand_name' => Brand name via products.brand_id,
+    ])
+    ->with(['stockable', 'location'])
     ->whereHasMorph('stockable', [Product::class])
     ->where('quantity', '>', 0)
-    ->addSelect([
-        'last_movement_at' => Movement::query()
-            ->whereColumn('stockable_id', 'inventorix_stocks.stockable_id')
-            ->whereColumn('stockable_type', 'inventorix_stocks.stockable_type')
-            ->whereColumn('location_id', 'inventorix_stocks.location_id')
-            ->where('type', MovementType::Deduct)
-            ->selectRaw('MAX(created_at)')
-            ->limit(1),
-    ])
-    ->having('last_movement_at', '<', now()->subDays($minDaysInactive))
-    ->orHavingNull('last_movement_at')
+    ->whereNotExists(/* deduct movement since now() - minDaysInactive */);
 ```
 
-Alternative approach using a raw join:
-```sql
-SELECT s.*, MAX(m.created_at) as last_deduct_at
-FROM inventorix_stocks s
-LEFT JOIN inventorix_movements m
-    ON m.stockable_id = s.stockable_id
-    AND m.stockable_type = s.stockable_type
-    AND m.location_id = s.location_id
-    AND m.type = 'Deduct'
-WHERE s.quantity > 0
-GROUP BY s.id
-HAVING last_deduct_at < DATE_SUB(NOW(), INTERVAL ? DAY)
-    OR last_deduct_at IS NULL
-```
+The Min Days Inactive filter feeds the cutoff (the table query is a closure, so it is rebuilt with the current filter value). Brand is selected as a subquery because a nested eager load through the `stockable` morphTo (`stockable.brand`) cannot be serialized for exports.
+
+## Export
+
+Header action `ExportAction` → `App\Filament\Exports\DeadStockReportExporter` (model `Stock`). It exports the page's filtered/sorted table query, so `last_deduct_at` and `brand_name` come from the same subqueries — no per-row queries.
+
+Columns: Product, Brand, Location, Qty On Hand, Last Movement Date, Days Since Last Movement, Stock Value (`quantity × product.cost`). Formatting helpers (`formatLastMovement`, `formatDaysInactive`, `stockValue`) are static on the page and reused by the exporter.
 
 ## Performance
 
-- Single query with subquery or LEFT JOIN
-- Paginate 25 rows default
+- One paginated query; `last_deduct_at` / `brand_name` are correlated subqueries evaluated only for the returned page (previously a `MAX(created_at)` aggregate over every stockable/location pair was loaded on each render).
+- Query count per render is constant (verified by a `countQueries` test).

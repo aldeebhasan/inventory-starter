@@ -54,14 +54,18 @@ Movement::query()
     ->where('type', MovementType::Add)
     ->whereNotNull('expires_at')
     ->whereRaw('quantity - COALESCE(consumed_quantity, 0) > 0')
-    ->when(!$showExpired, fn ($q) => $q->where('expires_at', '>=', now()))
-    ->when($daysFilter, fn ($q) => $q->where('expires_at', '<=', now()->addDays($daysFilter)))
-    ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
-    ->when($productId, fn ($q) => $q->where('stockable_id', $productId)
-        ->where('stockable_type', Product::class))
 ```
+
+- Days Until Expiry filter: `expires_at <= now() + N days`.
+- Show Expired off: `expires_at >= today()` — lots expiring today (0 days) are still shown.
+- Derived values (`qtyRemaining`, `daysUntilExpiry`, `status`) are static helpers on the page, reused by the exporter.
+
+## Export
+
+Header action `ExportAction` → `App\Filament\Exports\ExpiringStockExporter` (model `Movement`), with option `days_threshold` set from the Days Until Expiry filter (used for the Expiring Soon / OK status). `stockable` and `location` are eager-loaded — no per-row queries.
+
+Columns: Product, Location, Lot Reference, Qty Remaining, Cost/Unit, Expires At, Days Until Expiry, Status.
 
 ## Performance
 
-- Single query, all filters push to SQL
-- Paginate 25 rows default
+- One paginated query plus eager loads; query count per render is constant (verified by a `countQueries` test).

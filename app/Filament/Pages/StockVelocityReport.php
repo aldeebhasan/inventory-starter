@@ -5,10 +5,12 @@ namespace App\Filament\Pages;
 use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Models\Movement;
 use Aldeebhasan\Inventorix\Models\Stock;
+use App\Filament\Exports\StockVelocityReportExporter;
 use App\Models\Category;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -18,8 +20,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class StockVelocityReport extends Page implements HasTable
@@ -48,12 +48,6 @@ class StockVelocityReport extends Page implements HasTable
         return 'How fast each product is consumed and how many days of stock remain at current usage rates.';
     }
 
-    /** @var Collection<string, Movement>|null */
-    protected ?Collection $velocityCache = null;
-
-    /** @var Collection<int, Movement>|null */
-    protected ?Collection $peakCache = null;
-
     protected function getPeriod(): int
     {
         $filter = $this->tableFilters['period']['value'] ?? null;
@@ -61,73 +55,101 @@ class StockVelocityReport extends Page implements HasTable
         return $filter ? (int) $filter : 30;
     }
 
-    protected function getVelocities(): Collection
+    /**
+     * Deduct movements of the outer stock row (same stockable + location) within the period.
+     *
+     * @return Builder<Movement>
+     */
+    protected static function deductsInPeriod(int $period): Builder
     {
-        if ($this->velocityCache !== null) {
-            return $this->velocityCache;
-        }
-
-        $this->velocityCache = Movement::query()
-            ->where('type', MovementType::Deduct)
-            ->where('created_at', '>=', now()->subDays($this->getPeriod()))
-            ->selectRaw('stockable_id, location_id, SUM(quantity) as total_deducted, COUNT(DISTINCT DATE(created_at)) as active_days')
-            ->groupBy('stockable_id', 'location_id')
-            ->get()
-            ->keyBy(fn ($m) => $m->stockable_id.'-'.$m->location_id);
-
-        return $this->velocityCache;
+        return Movement::query()
+            ->whereColumn('inventorix_movements.stockable_id', 'inventorix_stocks.stockable_id')
+            ->whereColumn('inventorix_movements.stockable_type', 'inventorix_stocks.stockable_type')
+            ->whereColumn('inventorix_movements.location_id', 'inventorix_stocks.location_id')
+            ->where('inventorix_movements.type', MovementType::Deduct->value)
+            ->where('inventorix_movements.created_at', '>=', now()->subDays($period)->toDateTimeString());
     }
 
-    protected function getPeaks(): Collection
+    /**
+     * Stocks with `total_deducted` and `peak_demand_date` selected as correlated subqueries,
+     * so only the returned rows are aggregated. Shared with {@see StockVelocityReportExporter}.
+     *
+     * @return Builder<Stock>
+     */
+    public static function getReportQuery(int $period): Builder
     {
-        if ($this->peakCache !== null) {
-            return $this->peakCache;
-        }
-
-        $this->peakCache = Movement::query()
-            ->where('type', MovementType::Deduct)
-            ->where('created_at', '>=', now()->subDays($this->getPeriod()))
-            ->selectRaw('stockable_id, location_id, DATE(created_at) as demand_date, SUM(quantity) as daily_total')
-            ->groupBy('stockable_id', 'location_id', DB::raw('DATE(created_at)'))
-            ->orderByDesc('daily_total')
-            ->get()
-            ->unique(fn ($m) => $m->stockable_id.'-'.$m->location_id);
-
-        return $this->peakCache;
+        return Stock::query()
+            ->select('inventorix_stocks.*')
+            ->addSelect([
+                'total_deducted' => static::deductsInPeriod($period)->selectRaw('COALESCE(SUM(inventorix_movements.quantity), 0)'),
+                'peak_demand_date' => static::deductsInPeriod($period)
+                    ->selectRaw('DATE(inventorix_movements.created_at)')
+                    ->groupByRaw('DATE(inventorix_movements.created_at)')
+                    ->orderByRaw('SUM(inventorix_movements.quantity) DESC')
+                    ->limit(1),
+            ])
+            ->with(['stockable', 'location'])
+            ->whereHasMorph('stockable', [Product::class])
+            ->where('quantity', '>', 0);
     }
 
-    protected function getVelocityFor(Stock $record): ?object
+    /**
+     * Restrict to a velocity status in SQL. Days of stock = available / (deducted / period),
+     * so "days < N" is rewritten as "available * period < N * deducted" (no division).
+     *
+     * @param  Builder<Stock>  $query
+     * @return Builder<Stock>
+     */
+    public static function applyStatusFilter(Builder $query, string $status, int $period): Builder
     {
-        return $this->getVelocities()->get($record->stockable_id.'-'.$record->location_id);
+        $deducted = static::deductsInPeriod($period)->selectRaw('COALESCE(SUM(inventorix_movements.quantity), 0)')->toBase();
+        $sql = '('.$deducted->toSql().')';
+        $available = '(inventorix_stocks.quantity - inventorix_stocks.reserved_quantity) * ?';
+
+        return match ($status) {
+            'critical' => $query->whereRaw("{$sql} > 0 AND {$available} < 7 * {$sql}", [...$deducted->getBindings(), $period, ...$deducted->getBindings()]),
+            'warning' => $query->whereRaw("{$sql} > 0 AND {$available} >= 7 * {$sql} AND {$available} < 14 * {$sql}", [...$deducted->getBindings(), $period, ...$deducted->getBindings(), $period, ...$deducted->getBindings()]),
+            'healthy' => $query->whereRaw("({$sql} <= 0 OR {$available} >= 14 * {$sql})", [...$deducted->getBindings(), $period, ...$deducted->getBindings()]),
+            default => $query,
+        };
     }
 
-    protected function getPeakFor(Stock $record): ?Movement
+    public static function available(Stock $record): float
     {
-        return $this->getPeaks()->first(fn ($m) => $m->stockable_id == $record->stockable_id && $m->location_id == $record->location_id);
+        return (float) $record->quantity - (float) $record->reserved_quantity;
     }
 
-    protected function getDaysOfStock(Stock $record): ?float
+    public static function avgDailyConsumption(Stock $record, int $period): float
     {
-        $velocity = $this->getVelocityFor($record);
-        if (! $velocity || $velocity->total_deducted <= 0) {
-            return null;
-        }
+        return (float) $record->getAttribute('total_deducted') / max($period, 1);
+    }
 
-        $available = $record->quantity - $record->reserved_quantity;
-        $avgDaily = $velocity->total_deducted / $this->getPeriod();
+    public static function daysOfStock(Stock $record, int $period): ?float
+    {
+        $avgDaily = static::avgDailyConsumption($record, $period);
 
-        return $avgDaily > 0 ? $available / $avgDaily : null;
+        return $avgDaily > 0 ? static::available($record) / $avgDaily : null;
+    }
+
+    public static function formatDaysOfStock(?float $days): string
+    {
+        return $days === null ? '∞' : (string) (int) $days;
+    }
+
+    public static function status(?float $days): string
+    {
+        return match (true) {
+            $days === null => 'Healthy',
+            $days < 7 => 'Critical',
+            $days < 14 => 'Warning',
+            default => 'Healthy',
+        };
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->query(
-                Stock::query()
-                    ->with(['stockable.brand', 'location'])
-                    ->whereHasMorph('stockable', [Product::class])
-                    ->where('quantity', '>', 0)
-            )
+            ->query(fn (): Builder => static::getReportQuery($this->getPeriod()))
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -138,7 +160,11 @@ class StockVelocityReport extends Page implements HasTable
                             fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
                         );
                     })
-                    ->sortable(),
+                    // stockable is a morphTo, so sort by the product name through a subquery.
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Product::query()->select('name')->whereColumn('products.id', 'inventorix_stocks.stockable_id')->limit(1),
+                        $direction,
+                    )),
 
                 TextColumn::make('location.name')
                     ->label('Location')
@@ -152,71 +178,28 @@ class StockVelocityReport extends Page implements HasTable
                 TextColumn::make('available')
                     ->label('Available')
                     ->numeric(decimalPlaces: 2)
-                    ->state(fn (Stock $record): float => $record->quantity - $record->reserved_quantity),
+                    ->state(fn (Stock $record): float => static::available($record)),
 
                 TextColumn::make('avg_daily_consumption')
                     ->label('Avg Daily Consumption')
-                    ->state(function (Stock $record): string {
-                        $velocity = $this->getVelocityFor($record);
-                        if (! $velocity || $velocity->total_deducted <= 0) {
-                            return '0.00';
-                        }
-
-                        return number_format($velocity->total_deducted / $this->getPeriod(), 2);
-                    }),
+                    ->state(fn (Stock $record): string => number_format(static::avgDailyConsumption($record, $this->getPeriod()), 2)),
 
                 TextColumn::make('days_of_stock')
                     ->label('Days of Stock')
-                    ->state(function (Stock $record): string {
-                        $days = $this->getDaysOfStock($record);
+                    ->state(fn (Stock $record): string => static::formatDaysOfStock(static::daysOfStock($record, $this->getPeriod()))),
 
-                        return $days === null ? '∞' : (string) (int) $days;
-                    }),
-
-                TextColumn::make('peak_demand_day')
+                TextColumn::make('peak_demand_date')
                     ->label('Peak Demand Day')
-                    ->state(function (Stock $record): string {
-                        $peak = $this->getPeakFor($record);
-
-                        return $peak?->getAttribute('demand_date') ?? '—';
-                    }),
+                    ->placeholder('—'),
 
                 TextColumn::make('velocity_status')
                     ->label('Status')
                     ->badge()
-                    ->state(function (Stock $record): string {
-                        $days = $this->getDaysOfStock($record);
-
-                        if ($days === null) {
-                            return 'Healthy';
-                        }
-
-                        if ($days < 7) {
-                            return 'Critical';
-                        }
-
-                        if ($days < 14) {
-                            return 'Warning';
-                        }
-
-                        return 'Healthy';
-                    })
-                    ->color(function (Stock $record): string {
-                        $days = $this->getDaysOfStock($record);
-
-                        if ($days === null) {
-                            return 'success';
-                        }
-
-                        if ($days < 7) {
-                            return 'danger';
-                        }
-
-                        if ($days < 14) {
-                            return 'warning';
-                        }
-
-                        return 'success';
+                    ->state(fn (Stock $record): string => static::status(static::daysOfStock($record, $this->getPeriod())))
+                    ->color(fn (string $state): string => match ($state) {
+                        'Critical' => 'danger',
+                        'Warning' => 'warning',
+                        default => 'success',
                     }),
             ])
             ->filters([
@@ -251,6 +234,7 @@ class StockVelocityReport extends Page implements HasTable
                         '90' => '90 days',
                     ])
                     ->default('30')
+                    // Applied in getReportQuery() via the table query.
                     ->query(fn (Builder $query, array $data): Builder => $query),
 
                 SelectFilter::make('status')
@@ -260,7 +244,14 @@ class StockVelocityReport extends Page implements HasTable
                         'warning' => 'Warning (<14d)',
                         'healthy' => 'Healthy',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => $query),
+                    ->query(fn (Builder $query, array $data): Builder => blank($data['value'])
+                        ? $query
+                        : static::applyStatusFilter($query, $data['value'], $this->getPeriod())),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(StockVelocityReportExporter::class)
+                    ->options(fn (): array => ['period' => $this->getPeriod()]),
             ])
             ->defaultSort('quantity', 'asc');
     }

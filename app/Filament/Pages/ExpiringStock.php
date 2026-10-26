@@ -4,10 +4,12 @@ namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Models\Movement;
+use App\Filament\Exports\ExpiringStockExporter;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
 use Carbon\Carbon;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\Toggle;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -47,6 +49,32 @@ class ExpiringStock extends Page implements HasTable
         return 'Lot-level stock nearing or past its expiry date — prioritize usage or disposal before spoilage.';
     }
 
+    protected function getDaysThreshold(): int
+    {
+        return (int) (($this->tableFilters['days_until_expiry']['value'] ?? null) ?: 30);
+    }
+
+    public static function qtyRemaining(Movement $record): float
+    {
+        return (float) $record->quantity - (float) ($record->consumed_quantity ?? 0);
+    }
+
+    public static function daysUntilExpiry(Movement $record): int
+    {
+        return (int) now()->startOfDay()->diffInDays(Carbon::parse($record->expires_at)->startOfDay(), false);
+    }
+
+    public static function status(Movement $record, int $daysThreshold): string
+    {
+        $days = static::daysUntilExpiry($record);
+
+        return match (true) {
+            $days < 0 => 'Expired',
+            $days <= $daysThreshold => 'Expiring Soon',
+            default => 'OK',
+        };
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -78,9 +106,7 @@ class ExpiringStock extends Page implements HasTable
 
                 TextColumn::make('qty_remaining')
                     ->label('Qty Remaining')
-                    ->state(fn (Movement $record): string => number_format(
-                        $record->quantity - ($record->consumed_quantity ?? 0), 3
-                    )),
+                    ->state(fn (Movement $record): string => number_format(static::qtyRemaining($record), 3)),
 
                 TextColumn::make('cost_per_unit')
                     ->label('Cost/Unit')
@@ -94,26 +120,12 @@ class ExpiringStock extends Page implements HasTable
 
                 TextColumn::make('days_until_expiry')
                     ->label('Days Until Expiry')
-                    ->state(function (Movement $record): string {
-                        $days = (int) now()->startOfDay()->diffInDays(Carbon::parse($record->expires_at)->startOfDay(), false);
-
-                        return (string) $days;
-                    }),
+                    ->state(fn (Movement $record): string => (string) static::daysUntilExpiry($record)),
 
                 TextColumn::make('expiry_status')
                     ->label('Status')
                     ->badge()
-                    ->state(function (Movement $record): string {
-                        $days = (int) now()->startOfDay()->diffInDays(Carbon::parse($record->expires_at)->startOfDay(), false);
-
-                        if ($days < 0) {
-                            return 'Expired';
-                        }
-
-                        $daysFilter = (int) ($this->tableFilters['days_until_expiry']['value'] ?? 30);
-
-                        return $days <= $daysFilter ? 'Expiring Soon' : 'OK';
-                    })
+                    ->state(fn (Movement $record): string => static::status($record, $this->getDaysThreshold()))
                     ->color(fn (string $state): string => match ($state) {
                         'Expired' => 'danger',
                         'Expiring Soon' => 'warning',
@@ -146,7 +158,8 @@ class ExpiringStock extends Page implements HasTable
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         if (! ($data['show_expired'] ?? false)) {
-                            return $query->where('expires_at', '>=', now());
+                            // Lots expiring today are not expired yet (days until expiry = 0).
+                            return $query->where('expires_at', '>=', today());
                         }
 
                         return $query;
@@ -178,6 +191,11 @@ class ExpiringStock extends Page implements HasTable
                         return $query->where('stockable_id', $data['value'])
                             ->where('stockable_type', Product::class);
                     }),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(ExpiringStockExporter::class)
+                    ->options(fn (): array => ['days_threshold' => $this->getDaysThreshold()]),
             ])
             ->defaultSort('expires_at', 'asc');
     }
