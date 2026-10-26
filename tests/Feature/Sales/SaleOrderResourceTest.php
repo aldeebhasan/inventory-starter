@@ -1,11 +1,14 @@
 <?php
 
+use App\Enums\ReturnOrderStatus;
 use App\Enums\SaleOrderStatus;
+use App\Filament\Resources\RefundedOrders\RefundedOrderResource;
 use App\Filament\Resources\SaleOrders\Pages\CreateSaleOrder;
 use App\Filament\Resources\SaleOrders\Pages\ListSaleOrders;
 use App\Filament\Resources\SaleOrders\Pages\ViewSaleOrder;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\ReturnOrder;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\Unit;
@@ -293,4 +296,60 @@ it('can filter sale orders by status', function () {
         ->filterTable('status', SaleOrderStatus::Draft->value)
         ->assertCanSeeTableRecords([$draft])
         ->assertCanNotSeeTableRecords([$shipped]);
+});
+
+// --- Refund status ---
+
+it('links customer refunds to the sale order', function () {
+    $order = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+    $first = ReturnOrder::factory()->cancelled()->create(['sale_order_id' => $order->id, 'location_id' => $this->location->id]);
+    $latest = ReturnOrder::factory()->completed()->create(['sale_order_id' => $order->id, 'location_id' => $this->location->id]);
+    ReturnOrder::factory()->supplierReturn()->create(['sale_order_id' => $order->id, 'location_id' => $this->location->id]);
+
+    expect($order->refunds->pluck('id')->all())->toEqualCanonicalizing([$first->id, $latest->id])
+        ->and($order->latestRefund->id)->toBe($latest->id);
+});
+
+it('shows the latest refund status in the sale orders table', function () {
+    $refunded = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+    ReturnOrder::factory()->completed()->create(['sale_order_id' => $refunded->id, 'location_id' => $this->location->id]);
+    $notRefunded = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+
+    Livewire::test(ListSaleOrders::class)
+        ->assertTableColumnStateSet('latestRefund.status', ReturnOrderStatus::Completed, $refunded)
+        ->assertTableColumnStateNotSet('latestRefund.status', ReturnOrderStatus::Completed, $notRefunded);
+});
+
+it('shows refunds on the sale order view page', function () {
+    $order = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+    $refund = ReturnOrder::factory()->completed()->create(['sale_order_id' => $order->id, 'location_id' => $this->location->id]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->assertSuccessful()
+        ->assertSee('Refunds')
+        ->assertSee($refund->order_number)
+        ->assertSee(RefundedOrderResource::getUrl('view', ['record' => $refund]));
+});
+
+it('hides the refunds section when the sale order has no refunds', function () {
+    $order = SaleOrder::factory()->shipped()->create([
+        'customer_id' => $this->customer->id,
+        'location_id' => $this->location->id,
+    ]);
+
+    Livewire::test(ViewSaleOrder::class, ['record' => $order->id])
+        ->assertSuccessful()
+        ->assertDontSee('Refund #');
 });

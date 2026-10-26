@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources\SaleOrders\Schemas;
 
+use App\Filament\Resources\RefundedOrders\RefundedOrderResource;
 use App\Filament\Schemas\StatusHistorySection;
+use App\Models\ReturnOrder;
+use App\Models\SaleOrder;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -64,6 +67,30 @@ class SaleOrderInfolist
                             ])
                             ->columnSpanFull(),
                     ])->columnSpanFull(),
+                Section::make('Refunds')
+                    ->schema([
+                        RepeatableEntry::make('refunds')
+                            ->label('')
+                            ->schema([
+                                Grid::make(4)->schema([
+                                    TextEntry::make('order_number')
+                                        ->label('Refund #')
+                                        ->url(fn (ReturnOrder $record): string => RefundedOrderResource::getUrl('view', ['record' => $record]))
+                                        ->color('primary'),
+                                    TextEntry::make('status')
+                                        ->badge()
+                                        ->color(fn ($state) => $state?->color()),
+                                    TextEntry::make('created_at')
+                                        ->label('Date')
+                                        ->dateTime(),
+                                    TextEntry::make('reason')
+                                        ->placeholder('-'),
+                                ]),
+                            ])
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn (SaleOrder $record): bool => $record->refunds()->exists())
+                    ->columnSpanFull(),
                 StatusHistorySection::make(),
             ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\TracksStatus;
+use App\Enums\ReturnOrderType;
 use App\Enums\SaleOrderStatus;
 use Carbon\Carbon;
 use Database\Factories\SaleOrderFactory;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -27,6 +29,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Collection<int, SaleOrderItem> $items
  * @property-read Customer $customer
  * @property-read Location $location
+ * @property-read Collection<int, ReturnOrder> $refunds
+ * @property-read ReturnOrder|null $latestRefund
  */
 #[Fillable(['order_number', 'customer_id', 'location_id', 'status', 'ordered_at', 'shipped_at', 'notes', 'created_by'])]
 class SaleOrder extends Model
@@ -69,5 +73,20 @@ class SaleOrder extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** @return HasMany<ReturnOrder, $this> */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(ReturnOrder::class)->where('type', ReturnOrderType::CustomerReturn);
+    }
+
+    /** @return HasOne<ReturnOrder, $this> */
+    public function latestRefund(): HasOne
+    {
+        return $this->hasOne(ReturnOrder::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->where('type', ReturnOrderType::CustomerReturn),
+        );
     }
 }

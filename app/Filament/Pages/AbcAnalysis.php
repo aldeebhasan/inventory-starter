@@ -48,7 +48,7 @@ class AbcAnalysis extends Page implements HasTable
         return 'Classify products by consumption value — A items (top 80%), B (next 15%), C (remaining 5%) — to focus inventory control efforts.';
     }
 
-    /** @var Collection<int|string, array{consumption_qty: float, consumption_value: float, avg_cost: float, cumulative_pct: float|int, abc_class: string}>|null */
+    /** @var Collection<int, array{consumption_qty: float, consumption_value: float, avg_cost: float, cumulative_pct: float|int, abc_class: string}>|null */
     protected ?Collection $abcCache = null;
 
     protected function getDateFrom(): string

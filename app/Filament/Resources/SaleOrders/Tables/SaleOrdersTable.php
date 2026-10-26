@@ -32,6 +32,11 @@ class SaleOrdersTable
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn ($state) => $state?->color()),
+                TextColumn::make('latestRefund.status')
+                    ->label('Refund')
+                    ->badge()
+                    ->color(fn ($state) => $state?->color())
+                    ->placeholder('—'),
                 TextColumn::make('ordered_at')
                     ->date()
                     ->sortable(),

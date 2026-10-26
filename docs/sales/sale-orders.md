@@ -48,7 +48,7 @@ When a sale order is updated (while in Draft), item changes must be handled prop
 
 ## Models
 
-- `SaleOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => SaleOrderStatus`, `ordered_at`, `shipped_at` as datetime; relationships: `customer()`, `location()`, `items()`, `createdBy()`, `statusLogs()` (from TracksStatus)
+- `SaleOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => SaleOrderStatus`, `ordered_at`, `shipped_at` as datetime; relationships: `customer()`, `location()`, `items()`, `createdBy()`, `refunds()` hasMany ReturnOrder (customer returns only), `latestRefund()` hasOne ReturnOrder via `ofMany(['id' => 'max'])` (customer returns only), `statusLogs()` (from TracksStatus)
 - `SaleOrderItem` -- `#[Fillable([..., 'unit_id', ...])]`; relationships: `saleOrder()`, `product()`, `unit()` belongsTo Unit, `reservation()` belongsTo `Aldeebhasan\Inventorix\Models\Reservation`; method: `convertedQuantity(): float` -- returns `quantity` converted to the product's base unit via `unit->convertQty()`
 
 ## `SaleOrderStatus` Enum
@@ -89,6 +89,7 @@ enum SaleOrderStatus: string
 | customer.name | sortable |
 | location.name | |
 | status | badge with color per status |
+| latestRefund.status | badge, label 'Refund' -- status of the most recent refund, placeholder '—' when none |
 | ordered_at | date, sortable |
 | items_count | counts('items'), label 'Lines' |
 
@@ -108,6 +109,8 @@ Pages: `ListSaleOrders`, `CreateSaleOrder`, `ViewSaleOrder`, `EditSaleOrder` (Dr
 | CreateSaleReturnAction | visible on Shipped/Fulfilled | links to Refunded Order create page |
 
 ### View Page
+
+Includes a "Refunds" section (visible only when refunds exist) listing each linked refund: Refund # (links to the Refunded Order view page), status badge, date, and reason.
 
 Includes a "Status History" section showing all status transitions from `statusLogs()` -- see `docs/status-tracking.md` for the display pattern.
 
