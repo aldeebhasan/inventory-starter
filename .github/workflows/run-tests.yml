@@ -29,7 +29,9 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         php: [8.4, 8.3]
-        laravel: [13.*, 12.*]
+        # The app requires laravel/framework ^13.8 and its models use Laravel 13's #[Fillable] attribute,
+        # which Laravel 12 silently ignores (every model ends up with no fillable fields).
+        laravel: [13.*]
         stability: [prefer-lowest, prefer-stable]
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
