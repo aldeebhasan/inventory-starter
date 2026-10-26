@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "44a0549fd3d4003868456857fae01e4b",
+    "content-hash": "aa5ced8704513d302db7b6c6ccd34be6",
     "packages": [
         {
             "name": "aldeebhasan/inventorix",
