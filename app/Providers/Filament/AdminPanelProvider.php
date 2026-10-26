@@ -90,6 +90,13 @@ class AdminPanelProvider extends PanelProvider
             ->group($group)
             ->icon(Heroicon::OutlinedChartBar)
             ->sort(1000)
+            // Filament only marks a group active through its top-level items, so flag this item active when one of
+            // its report pages is open; otherwise the group would render collapsed on report pages.
+            ->isActiveWhen(fn (): bool => collect(filament()->getPages())->contains(
+                fn (string $page): bool => $page::getNavigationGroup() === $group
+                    && $page::getNavigationParentItem() === 'Reports'
+                    && request()->routeIs($page::getNavigationItemActiveRoutePattern())
+            ))
             ->extraAttributes(['class' => 'fi-sidebar-reports-item']);
     }
 }

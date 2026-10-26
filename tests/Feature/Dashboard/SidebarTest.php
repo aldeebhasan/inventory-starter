@@ -47,3 +47,19 @@ it('marks the reports item active when a report page is open', function () {
         ->assertSuccessful()
         ->assertSee('class="fi-sidebar-item fi-sidebar-item-has-active-child-items fi-sidebar-reports-item"', false);
 });
+
+it('marks the parent module section active when a report page is open', function (string $page, string $group) {
+    $html = $this->get($page::getUrl())->assertSuccessful()->getContent();
+
+    expect($html)->toMatch('/data-group-label="'.$group.'"[^>]*class="[^"]*\bfi-active\b/');
+})->with([
+    [SalesSummary::class, 'Sales'],
+    [SupplierPerformance::class, 'Purchase'],
+    [AbcAnalysis::class, 'Inventory'],
+]);
+
+it('does not mark other module sections active when a report page is open', function () {
+    $html = $this->get(SalesSummary::getUrl())->assertSuccessful()->getContent();
+
+    expect($html)->not->toMatch('/data-group-label="(Purchase|Inventory)"[^>]*class="[^"]*\bfi-active\b/');
+});
