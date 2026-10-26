@@ -1,11 +1,20 @@
 <?php
 
+use Aldeebhasan\Inventorix\DTOs\StockOperationDto;
 use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Models\Movement;
 use App\Enums\ProductType;
+use App\Filament\Exports\InventoryTransactionsExporter;
 use App\Filament\Pages\InventoryTransactions;
+use App\Models\Location;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\User;
+use Filament\Actions\ExportAction;
+use Filament\Actions\Exports\Models\Export;
+use Filament\Actions\Testing\TestAction;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -84,4 +93,99 @@ it('can filter movements by type', function () {
 it('defaults to descending date sort', function () {
     Livewire::test(InventoryTransactions::class)
         ->assertSuccessful();
+});
+
+function seedInventoryTransactionsPageMovements(int $count, Location $location): void
+{
+    for ($i = 0; $i < $count; $i++) {
+        $order = PurchaseOrder::factory()->create(['location_id' => $location->id]);
+        $product = Product::factory()->create(['type' => ProductType::Inventory]);
+        $product->addStock(5, $location, new StockOperationDto(causable: $order));
+    }
+}
+
+it('does not run per-row queries when rendering, including the source document column', function () {
+    seedInventoryTransactionsPageMovements(2, $this->location);
+    $small = countQueries(fn () => Livewire::test(InventoryTransactions::class)->toggleAllTableColumns()->assertCountTableRecords(2));
+
+    seedInventoryTransactionsPageMovements(6, $this->location);
+    $large = countQueries(fn () => Livewire::test(InventoryTransactions::class)->toggleAllTableColumns()->assertCountTableRecords(8));
+
+    expect($large)->toBe($small);
+});
+
+it('shows the source document from the eager-loaded causable', function () {
+    $order = PurchaseOrder::factory()->create(['location_id' => $this->location->id]);
+    $this->product->addStock(5, $this->location, new StockOperationDto(causable: $order));
+    $movement = Movement::query()->firstOrFail();
+
+    Livewire::test(InventoryTransactions::class)
+        ->assertTableColumnStateSet('source_document', $order->refresh()->order_number, $movement);
+});
+
+it('sorts by product name', function () {
+    $zeta = Product::factory()->create(['type' => ProductType::Inventory, 'name' => 'Zeta']);
+    $alpha = Product::factory()->create(['type' => ProductType::Inventory, 'name' => 'Alpha']);
+    $zeta->addStock(5, $this->location);
+    $alpha->addStock(5, $this->location);
+
+    $zetaMovement = Movement::where('stockable_id', $zeta->id)->firstOrFail();
+    $alphaMovement = Movement::where('stockable_id', $alpha->id)->firstOrFail();
+
+    Livewire::test(InventoryTransactions::class)
+        ->sortTable('stockable.name')
+        ->assertCanSeeTableRecords([$alphaMovement, $zetaMovement], inOrder: true)
+        ->sortTable('stockable.name', 'desc')
+        ->assertCanSeeTableRecords([$zetaMovement, $alphaMovement], inOrder: true);
+});
+
+it('dispatches an export from the table header', function () {
+    $this->product->addStock(10, $this->location);
+    $exports = ExportAction::fake();
+
+    Livewire::test(InventoryTransactions::class)
+        ->callAction(TestAction::make('export')->table())
+        ->assertHasNoFormErrors();
+
+    $exports->assertDispatched(InventoryTransactionsExporter::class, function (Export $export, Builder $query): bool {
+        expect($query->count())->toBe(1);
+
+        return true;
+    });
+});
+
+it('exports row values matching the table columns', function () {
+    $this->product->update(['name' => 'Hammer']);
+    $order = PurchaseOrder::factory()->create(['location_id' => $this->location->id]);
+    $this->product->addStock(5, $this->location, new StockOperationDto(causable: $order, note: 'Received'));
+
+    $movement = Movement::query()->with(['stockable', 'location', 'transaction.causable'])->firstOrFail();
+
+    $row = InventoryTransactionsExporter::test(columnMap: [
+        'stockable.name' => 'Product',
+        'location.name' => 'Location',
+        'type' => 'Type',
+        'source_document' => 'Source Document',
+        'note' => 'Note',
+    ])->export($movement);
+
+    expect($row)->toBe(['Hammer', $this->location->name, MovementType::Add->value, $order->refresh()->order_number, 'Received']);
+});
+
+it('runs a real csv export end to end', function () {
+    Storage::fake('local');
+    seedInventoryTransactionsPageMovements(3, $this->location);
+
+    Livewire::test(InventoryTransactions::class)
+        ->callAction(TestAction::make('export')->table())
+        ->assertHasNoFormErrors();
+
+    $export = Export::query()->latest('id')->firstOrFail();
+    $csv = collect(Storage::disk('local')->files($export->getFileDirectory()))
+        ->filter(fn (string $file): bool => str_ends_with($file, '.csv'))
+        ->map(fn (string $file): string => Storage::disk('local')->get($file))
+        ->join('');
+
+    expect($export->refresh()->successful_rows)->toBe(3)
+        ->and($csv)->toContain(PurchaseOrder::query()->latest('id')->first()->order_number);
 });

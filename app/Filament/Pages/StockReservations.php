@@ -4,9 +4,11 @@ namespace App\Filament\Pages;
 
 use Aldeebhasan\Inventorix\Enums\ReservationStatus;
 use Aldeebhasan\Inventorix\Models\Reservation;
+use App\Filament\Exports\StockReservationsExporter;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -52,6 +54,9 @@ class StockReservations extends Page implements HasTable
                     ->with(['stockable', 'location', 'reference'])
                     ->whereHasMorph('stockable', [Product::class])
             )
+            ->headerActions([
+                ExportAction::make()->exporter(StockReservationsExporter::class),
+            ])
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -62,7 +67,10 @@ class StockReservations extends Page implements HasTable
                             fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
                         );
                     })
-                    ->sortable(),
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Product::query()->select('name')->whereColumn('products.id', 'inventorix_reservations.stockable_id'),
+                        $direction,
+                    )),
 
                 TextColumn::make('location.name')
                     ->label('Location')

@@ -6,9 +6,11 @@ use Aldeebhasan\Inventorix\Enums\MovementType;
 use Aldeebhasan\Inventorix\Enums\TransactionStatus;
 use Aldeebhasan\Inventorix\Enums\TransactionType;
 use Aldeebhasan\Inventorix\Models\Movement;
+use App\Filament\Exports\InventoryTransactionsExporter;
 use App\Models\Location;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -20,6 +22,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class InventoryTransactions extends Page implements HasTable
@@ -46,14 +49,31 @@ class InventoryTransactions extends Page implements HasTable
         return 'Detailed audit trail of every stock change — additions, deductions, and their source documents.';
     }
 
+    /**
+     * Label of the movement's source document; reads the eager-loaded transaction.causable.
+     */
+    public static function sourceDocument(Movement $record): ?string
+    {
+        $causable = $record->transaction?->getAttribute('causable');
+
+        if (! $causable instanceof Model) {
+            return null;
+        }
+
+        return $causable->getAttribute('order_number') ?? class_basename($causable).' #'.$causable->getKey();
+    }
+
     public function table(Table $table): Table
     {
         return $table
             ->query(
                 Movement::query()
-                    ->with(['stockable', 'location', 'transaction'])
+                    ->with(['stockable', 'location', 'transaction.causable'])
                     ->whereHasMorph('stockable', [Product::class])
             )
+            ->headerActions([
+                ExportAction::make()->exporter(InventoryTransactionsExporter::class),
+            ])
             ->columns([
                 TextColumn::make('stockable.name')
                     ->label('Product')
@@ -64,7 +84,10 @@ class InventoryTransactions extends Page implements HasTable
                             fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
                         );
                     })
-                    ->sortable(),
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        Product::query()->select('name')->whereColumn('products.id', 'inventorix_movements.stockable_id'),
+                        $direction,
+                    )),
 
                 TextColumn::make('location.name')
                     ->label('Location')
@@ -99,14 +122,7 @@ class InventoryTransactions extends Page implements HasTable
 
                 TextColumn::make('source_document')
                     ->label('Source Document')
-                    ->state(function (Movement $record): string {
-                        $causable = $record->transaction?->getAttribute('causable');
-                        if (! $causable) {
-                            return '—';
-                        }
-
-                        return $causable->order_number ?? class_basename($causable).' #'.$causable->id;
-                    })
+                    ->state(fn (Movement $record): string => static::sourceDocument($record) ?? '—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('note')
