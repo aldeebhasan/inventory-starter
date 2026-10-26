@@ -154,3 +154,15 @@ Location: `tests/Feature/{Group}/{Model}ResourceTest.php`. Never skip or delete 
 - Page actions: `->callAction(DeleteAction::class)`. Table actions: `->callAction(TestAction::make('name')->table($record))`.
 
 </laravel-boost-guidelines>
+
+## Orchestration (multi-agent)
+
+For multi-part features (more than one resource, page, or action), the main thread acts as orchestrator and does not implement directly. Agents live in `.claude/agents/`.
+
+1. **`explorer`** — gather context and get a proposed split into work units.
+2. **`implementer`** — one agent per unit. Run independent units in parallel; use `isolation: "worktree"` when parallel units touch the same files.
+3. **`laravel-tester`** — one per finished unit. If it reports an app bug, send it back to that unit's implementer (via SendMessage).
+4. **`reviewer`** — review the combined diff; fix or delegate each finding.
+5. Orchestrator runs `php artisan test --compact` itself and reports the result.
+
+Single-file changes and small fixes skip orchestration and are done directly.
