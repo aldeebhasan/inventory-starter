@@ -75,7 +75,7 @@ Dashboard
 Catalog    → Products (1), Categories (2), Brands (3), Units (4), Addons (5)
 Sales      → Customers (1), Sale Orders (2), Refunded Orders (3)
              Reports ▸ Sales Summary (4), Returns Analysis (5)
-Purchase   → Suppliers (1), Purchase Orders (2)
+Purchase   → Suppliers (1), Purchase Orders (2), Supplier Returns (3)
              Reports ▸ Reorder Suggestions (3), Cost Analysis (4), Supplier Performance (5)
 Inventory  → Locations (1), Stocks (2), Stock Movements (3), Adjustments (4), Transfers (5),
              Stock Reservations (6)

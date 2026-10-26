@@ -7,6 +7,7 @@ use App\Enums\ReturnOrderType;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\ReturnOrder;
+use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -44,7 +45,13 @@ class ReturnOrderFactory extends Factory
         return $this->state([
             'type' => ReturnOrderType::SupplierReturn,
             'customer_id' => null,
+            'supplier_id' => Supplier::factory(),
         ]);
+    }
+
+    public function approved(): static
+    {
+        return $this->state(['status' => ReturnOrderStatus::Approved]);
     }
 
     public function completed(): static

@@ -37,7 +37,7 @@
 |---|---|
 | Categories, Brands, Units, Products, Addons | `docs/catalog.md` |
 | Customers, Sale Orders, Refunded Orders (customer returns) | `docs/sales/customers.md`, `docs/sales/sale-orders.md`, `docs/sales/customer-returns.md` |
-| Suppliers, Purchase Orders, Supplier Returns (spec only, not built) | `docs/purchase/suppliers.md`, `docs/purchase/purchase-orders.md`, `docs/purchase/supplier-returns.md` |
+| Suppliers, Purchase Orders, Supplier Returns | `docs/purchase/suppliers.md`, `docs/purchase/purchase-orders.md`, `docs/purchase/supplier-returns.md` |
 | Locations | `docs/inventory/locations.md` |
 | Transfer Orders | `docs/inventory/transfer-orders.md` |
 | Adjustment Orders | `docs/inventory/adjustment-orders.md` |

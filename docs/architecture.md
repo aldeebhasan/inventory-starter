@@ -12,7 +12,7 @@ A production-grade inventory management system built on Laravel 13 + Filament v5
 |---|---|
 | Catalog | [Categories, Brands, Units, Products, Addons](catalog.md) |
 | Sales | [Customers](sales/customers.md), [Sale Orders](sales/sale-orders.md), [Refunded Orders](sales/customer-returns.md) |
-| Purchase | [Suppliers](purchase/suppliers.md), [Purchase Orders](purchase/purchase-orders.md), [Supplier Returns](purchase/supplier-returns.md) (not implemented) |
+| Purchase | [Suppliers](purchase/suppliers.md), [Purchase Orders](purchase/purchase-orders.md), [Supplier Returns](purchase/supplier-returns.md) |
 | Inventory | [Locations](inventory/locations.md), [Transfer Orders](inventory/transfer-orders.md), [Adjustment Orders](inventory/adjustment-orders.md), [Stock Report](inventory/stock-report.md), [Movement History](inventory/movement-history.md), [Low Stock Alerts](inventory/low-stock-alerts.md) |
 
 See also: [Dashboard Widgets](dashboard/widgets.md)

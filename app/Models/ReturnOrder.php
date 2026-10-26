@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ReturnOrderType $type
  * @property ReturnOrderStatus $status
  * @property int|null $sale_order_id
+ * @property int|null $purchase_order_id
  * @property int|null $customer_id
  * @property int|null $supplier_id
  * @property int $location_id
@@ -33,8 +34,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Supplier|null $supplier
  * @property-read Location $location
  * @property-read SaleOrder|null $saleOrder
+ * @property-read PurchaseOrder|null $purchaseOrder
  */
-#[Fillable(['order_number', 'type', 'status', 'sale_order_id', 'customer_id', 'supplier_id', 'location_id', 'reason', 'notes', 'created_by'])]
+#[Fillable(['order_number', 'type', 'status', 'sale_order_id', 'purchase_order_id', 'customer_id', 'supplier_id', 'location_id', 'reason', 'notes', 'created_by'])]
 class ReturnOrder extends Model
 {
     /** @use HasFactory<ReturnOrderFactory> */
@@ -62,6 +64,11 @@ class ReturnOrder extends Model
     public function saleOrder(): BelongsTo
     {
         return $this->belongsTo(SaleOrder::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
     }
 
     public function customer(): BelongsTo

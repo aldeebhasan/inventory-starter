@@ -2,7 +2,7 @@
 
 **Navigation Group:** Purchase
 **Purpose:** Receive goods from suppliers into a warehouse location.
-**Referenced by:** Supplier Returns (not implemented yet -- see `docs/purchase/supplier-returns.md`).
+**Referenced by:** Supplier Returns -- a supplier return can reference a PO via `ReturnOrder::purchaseOrder()` (`purchase_order_id`). See `docs/purchase/supplier-returns.md`.
 **Status Tracking:** Uses `TracksStatus` trait -- see `docs/status-tracking.md`.
 
 **Do not:** Call `$product->addStock()` directly for a stock receipt. All stock additions from purchasing must go through a PurchaseOrder → Receive workflow so the movement is linked to the PO as `causable`.
@@ -16,7 +16,7 @@ Draft ──[Confirm]──> Confirmed ──[Receive]──> Received
 
 ## Models
 
-- `PurchaseOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => PurchaseOrderStatus`, `ordered_at`, `received_at` as datetime; relationships: `supplier()`, `location()`, `items()`, `createdBy()`
+- `PurchaseOrder` -- `HasFactory`, `SoftDeletes`, `TracksStatus`; casts: `status => PurchaseOrderStatus`, `ordered_at`, `received_at` as datetime; relationships: `supplier()`, `location()`, `items()`, `createdBy()`, `supplierReturns()` hasMany ReturnOrder (supplier returns only)
 - `PurchaseOrderItem` — `#[Fillable([..., 'unit_id', ...])]`; relationships: `purchaseOrder()`, `product()`, `unit()` belongsTo Unit; method: `convertedQuantity(): float` — returns `quantity` converted to the product's base unit via `unit->convertQty()`
 
 ## Filament Resource
@@ -97,3 +97,9 @@ Action::make('cancel')
     ->requiresConfirmation()
     ->action(fn (PurchaseOrder $record) => $record->update(['status' => PurchaseOrderStatus::Cancelled]))
 ```
+
+**CreateSupplierReturnAction** — visible on Received; links to the Supplier Return create page with `purchase_order_id`, `supplier_id`, `location_id` pre-filled. See `docs/purchase/supplier-returns.md`.
+
+### View Page
+
+Includes a "Supplier Returns" section (visible only when returns exist) listing each linked return: Return # (links to the return), status badge, date, and reason.

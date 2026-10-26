@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\TracksStatus;
 use App\Enums\PurchaseOrderStatus;
+use App\Enums\ReturnOrderType;
 use Carbon\Carbon;
 use Database\Factories\PurchaseOrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Collection<int, PurchaseOrderItem> $items
  * @property-read Supplier $supplier
  * @property-read Location $location
+ * @property-read Collection<int, ReturnOrder> $supplierReturns
  */
 #[Fillable(['order_number', 'supplier_id', 'location_id', 'status', 'ordered_at', 'received_at', 'notes', 'created_by'])]
 class PurchaseOrder extends Model
@@ -69,5 +71,11 @@ class PurchaseOrder extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** @return HasMany<ReturnOrder, $this> */
+    public function supplierReturns(): HasMany
+    {
+        return $this->hasMany(ReturnOrder::class)->where('type', ReturnOrderType::SupplierReturn);
     }
 }

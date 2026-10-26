@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources\PurchaseOrders\Schemas;
 
+use App\Filament\Resources\SupplierReturns\SupplierReturnResource;
 use App\Filament\Schemas\StatusHistorySection;
+use App\Models\PurchaseOrder;
+use App\Models\ReturnOrder;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -64,6 +67,30 @@ class PurchaseOrderInfolist
                             ])
                             ->columnSpanFull(),
                     ])->columnSpanFull(),
+                Section::make('Supplier Returns')
+                    ->schema([
+                        RepeatableEntry::make('supplierReturns')
+                            ->label('')
+                            ->schema([
+                                Grid::make(4)->schema([
+                                    TextEntry::make('order_number')
+                                        ->label('Return #')
+                                        ->url(fn (ReturnOrder $record): string => SupplierReturnResource::getUrl('view', ['record' => $record]))
+                                        ->color('primary'),
+                                    TextEntry::make('status')
+                                        ->badge()
+                                        ->color(fn ($state) => $state?->color()),
+                                    TextEntry::make('created_at')
+                                        ->label('Date')
+                                        ->dateTime(),
+                                    TextEntry::make('reason')
+                                        ->placeholder('-'),
+                                ]),
+                            ])
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn (PurchaseOrder $record): bool => $record->supplierReturns()->exists())
+                    ->columnSpanFull(),
                 StatusHistorySection::make(),
             ]);
     }

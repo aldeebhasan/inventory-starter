@@ -44,4 +44,13 @@ class ReturnOrderItem extends Model
     {
         return $this->belongsTo(Unit::class);
     }
+
+    /**
+     * Quantity converted to the product's base unit for inventory operations.
+     * If the line unit is a derived unit, multiplies by its conversion_factor.
+     */
+    public function convertedQuantity(): float
+    {
+        return $this->unit ? $this->unit->convertQty($this->quantity) : $this->quantity;
+    }
 }
