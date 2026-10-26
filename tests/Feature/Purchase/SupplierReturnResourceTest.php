@@ -361,7 +361,7 @@ it('can cancel a draft or approved supplier return with a logged reason', functi
 
     expect($return->fresh()->status)->toBe(ReturnOrderStatus::Cancelled)
         ->and($product->totalStock($this->location))->toBe(10.0)
-        ->and($return->statusLogs()->latest('id')->first()->reason)->toBe('Supplier refused');
+        ->and($return->statusLogs()->reorder()->latest('id')->first()->reason)->toBe('Supplier refused');
 })->with([ReturnOrderStatus::Draft, ReturnOrderStatus::Approved]);
 
 it('only offers cancel on a completed return', function () {
@@ -403,7 +403,7 @@ it('restores stock when cancelling a completed return', function () {
     expect($return->fresh()->status)->toBe(ReturnOrderStatus::Cancelled)
         ->and($product->totalStock($this->location))->toBe(10.0)
         ->and((float) $restore->cost_per_unit)->toBe(10.0)
-        ->and($return->statusLogs()->latest('id')->first()->reason)->toBe('Supplier rejected the return');
+        ->and($return->statusLogs()->reorder()->latest('id')->first()->reason)->toBe('Supplier rejected the return');
 });
 
 it('restores the base-unit quantity when cancelling a completed return in a derived unit', function () {
