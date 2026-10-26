@@ -84,18 +84,19 @@ class CustomerReturnsAnalysis extends Page implements HasTable
         return $table
             // Closure: evaluated per request so the qty_sold subquery sees the current date filter.
             // Grouped on products.id so the record key is the product: rows can be resolved/exported by key.
+            // Every selected product column is listed in GROUP BY: MariaDB (ONLY_FULL_GROUP_BY) rejects products.* grouped by id alone.
             ->query(fn (): Builder => Product::withTrashed()
                 ->join('return_order_items', 'return_order_items.product_id', '=', 'products.id')
                 ->join('return_orders', 'return_orders.id', '=', 'return_order_items.return_order_id')
                 ->where('return_orders.type', ReturnOrderType::CustomerReturn)
                 ->where('return_orders.status', ReturnOrderStatus::Completed)
-                ->select('products.*')
+                ->select(['products.id', 'products.name', 'products.brand_id'])
                 ->selectRaw('
                     SUM(return_order_items.quantity) as qty_returned,
                     SUM(return_order_items.quantity * COALESCE(return_order_items.price, 0)) as refund_amount
                 ')
                 ->selectSub($this->qtySoldSubquery(), 'qty_sold')
-                ->groupBy('products.id'))
+                ->groupBy('products.id', 'products.name', 'products.brand_id'))
             ->headerActions([
                 ExportAction::make()
                     ->exporter(CustomerReturnsAnalysisExporter::class),

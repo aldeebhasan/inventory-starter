@@ -63,6 +63,7 @@ class SalesSummary extends Page implements HasTable
         return $table
             ->query(
                 // Grouped on products.id so the record key is the product: rows can be resolved/exported by key.
+                // Every selected product column is listed in GROUP BY: MariaDB (ONLY_FULL_GROUP_BY) rejects products.* grouped by id alone.
                 Product::withTrashed()
                     ->with(['brand', 'categories'])
                     ->join('sale_order_items', 'sale_order_items.product_id', '=', 'products.id')
@@ -73,14 +74,14 @@ class SalesSummary extends Page implements HasTable
                         SaleOrderStatus::Picked,
                         SaleOrderStatus::Fulfilled,
                     ])
-                    ->select('products.*')
+                    ->select(['products.id', 'products.name', 'products.brand_id'])
                     ->selectRaw('
                         SUM(sale_order_items.quantity) as qty_sold,
                         AVG(sale_order_items.unit_price) as avg_unit_price,
                         SUM(sale_order_items.quantity * sale_order_items.unit_price) as total_revenue,
                         SUM(sale_order_items.quantity * products.cost) as total_cost
                     ')
-                    ->groupBy('products.id')
+                    ->groupBy('products.id', 'products.name', 'products.brand_id')
             )
             ->headerActions([
                 ExportAction::make()
