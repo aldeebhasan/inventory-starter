@@ -2,6 +2,7 @@
 
 use App\Models\Location;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -23,4 +24,24 @@ function createLocation(array $overrides = []): Location
         'is_active' => true,
         'meta' => ['type' => 'warehouse'],
     ], $overrides));
+}
+
+/**
+ * Number of database queries executed while running the callback.
+ *
+ * Used by report tests to prove a page's query count does not grow with its row count (no per-row queries).
+ */
+function countQueries(Closure $callback): int
+{
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    try {
+        $callback();
+
+        return count(DB::getQueryLog());
+    } finally {
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+    }
 }

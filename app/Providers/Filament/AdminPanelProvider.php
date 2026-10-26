@@ -48,6 +48,7 @@ class AdminPanelProvider extends PanelProvider
                 $this->reportsNavigationItem('Purchase'),
                 $this->reportsNavigationItem('Inventory'),
             ])
+            ->databaseNotifications()
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(PanelsRenderHook::SIDEBAR_NAV_END, fn (): string => view('filament.sidebar-accordion')->render())
             ->maxContentWidth('full')
