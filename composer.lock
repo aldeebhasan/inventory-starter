@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "aa5ced8704513d302db7b6c6ccd34be6",
+    "content-hash": "e11746e4dfb218f62afb2dc4b8c09239",
     "packages": [
         {
             "name": "aldeebhasan/inventorix",
@@ -83,6 +83,98 @@
                 }
             ],
             "time": "2026-08-30T23:05:43+00:00"
+        },
+        {
+            "name": "aldeebhasan/panorama",
+            "version": "v0.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/aldeebhasan/panorama.git",
+                "reference": "95fefd972c32732f69142b0d793c298d44617566"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/aldeebhasan/panorama/zipball/95fefd972c32732f69142b0d793c298d44617566",
+                "reference": "95fefd972c32732f69142b0d793c298d44617566",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/bus": "^11.0||^12.0||^13.0",
+                "illuminate/console": "^11.0||^12.0||^13.0",
+                "illuminate/contracts": "^11.0||^12.0||^13.0",
+                "illuminate/database": "^11.0||^12.0||^13.0",
+                "illuminate/http": "^11.0||^12.0||^13.0",
+                "illuminate/mail": "^11.0||^12.0||^13.0",
+                "illuminate/notifications": "^11.0||^12.0||^13.0",
+                "illuminate/queue": "^11.0||^12.0||^13.0",
+                "illuminate/support": "^11.0||^12.0||^13.0",
+                "php": "^8.2",
+                "psr/container": "^1.1||^2.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.14",
+                "nunomaduro/collision": "^8.9",
+                "orchestra/testbench": "^9.0||^10.0||^11.0",
+                "pestphp/pest": "^3.0||^4.0||^5.0",
+                "pestphp/pest-plugin-arch": "^3.0||^4.0||^5.0",
+                "pestphp/pest-plugin-laravel": "^3.0||^4.0||^5.0",
+                "phpstan/extension-installer": "^1.3||^2.0",
+                "phpstan/phpstan": "~2.3.0",
+                "phpstan/phpstan-deprecation-rules": "^2.0"
+            },
+            "suggest": {
+                "ext-zip": "Needed to render reports as XLSX."
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Datasets": "Aldeebhasan\\Panorama\\Facades\\Datasets",
+                        "Panorama": "Aldeebhasan\\Panorama\\Facades\\Panorama"
+                    },
+                    "providers": [
+                        "Aldeebhasan\\Panorama\\PanoramaServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Aldeebhasan\\Panorama\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Hasan Deeb",
+                    "email": "aldeeb.91@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "One wide view across every source: define filterable Laravel reports once, then aggregate, cache and generate them anywhere.",
+            "homepage": "https://github.com/aldeebhasan/panorama",
+            "keywords": [
+                "Hasan Deeb",
+                "analytics",
+                "laravel",
+                "panorama",
+                "reporting",
+                "reports"
+            ],
+            "support": {
+                "issues": "https://github.com/aldeebhasan/panorama/issues",
+                "source": "https://github.com/aldeebhasan/panorama/tree/v0.4.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/aldeebhasan",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-18T22:34:53+00:00"
         },
         {
             "name": "anourvalar/eloquent-serialize",
