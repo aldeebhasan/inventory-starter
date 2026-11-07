@@ -58,6 +58,7 @@
 | Supplier Performance report | `docs/purchase/reports/supplier-performance.md` |
 | Sales Summary report | `docs/sales/reports/sales-summary.md` |
 | Customer Returns Analysis report | `docs/sales/reports/customer-returns-analysis.md` |
+| Report Builder (user-built Panorama reports, datasets) | `docs/reports/report-builder.md` |
 | Reports roadmap (all phases) | `docs/reports-roadmap.md` |
 | Dashboard widgets | `docs/dashboard/widgets.md` |
 | Status tracking (global) | `docs/status-tracking.md` |

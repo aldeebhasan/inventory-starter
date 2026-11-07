@@ -27,3 +27,4 @@ Artisan::command('exports:prune {--days=7 : Delete exports older than this many 
 })->purpose('Delete old report export files and their records');
 
 Schedule::command('exports:prune')->daily();
+Schedule::command('reports:prune')->daily();

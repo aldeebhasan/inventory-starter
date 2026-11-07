@@ -1,5 +1,8 @@
 <?php
 
+use Aldeebhasan\Panorama\Notifications\ReportFailed;
+use Aldeebhasan\Panorama\Notifications\ReportReady;
+
 // config for Hasan Deeb/Panorama
 return [
     /*
@@ -18,7 +21,7 @@ return [
         ],
 
         'discover' => [
-            // app_path('Reports/Datasets') => 'App\Reports\Datasets',
+            app_path('Reports/Datasets') => 'App\Reports\Datasets',
         ],
     ],
 
@@ -76,8 +79,8 @@ return [
         'channels' => ['mail'],
         'attach_up_to' => 10 * 1024 * 1024,
         'notifications' => [
-            'ready' => Aldeebhasan\Panorama\Notifications\ReportReady::class,
-            'failed' => Aldeebhasan\Panorama\Notifications\ReportFailed::class,
+            'ready' => ReportReady::class,
+            'failed' => ReportFailed::class,
         ],
     ],
 

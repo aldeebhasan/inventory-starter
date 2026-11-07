@@ -2,8 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Resources\ReportDefinitions\Pages\BuildReport;
+use App\Filament\Resources\ReportDefinitions\Pages\CreateReport;
 use App\Filament\Widgets\InventoryStatsWidget;
 use App\Filament\Widgets\RecentMovementsWidget;
+use App\Http\Controllers\DownloadReportRunController;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -21,6 +24,8 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -42,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Sales'),
                 NavigationGroup::make('Purchase'),
                 NavigationGroup::make('Inventory'),
+                NavigationGroup::make('Report Builder'),
             ])
             ->navigationItems([
                 $this->reportsNavigationItem('Sales'),
@@ -49,7 +55,12 @@ class AdminPanelProvider extends PanelProvider
                 $this->reportsNavigationItem('Inventory'),
             ])
             ->databaseNotifications()
+            ->authenticatedRoutes(function (): void {
+                Route::get('report-builder/runs/{run}/download', DownloadReportRunController::class)->name('report-builder.download');
+            })
             ->sidebarCollapsibleOnDesktop()
+            // Chart.js is bundled for the report builder only, and loaded only on its pages.
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => Blade::render("@vite('resources/js/report-builder.js')"), scopes: [BuildReport::class, CreateReport::class])
             ->renderHook(PanelsRenderHook::SIDEBAR_NAV_END, fn (): string => view('filament.sidebar-accordion')->render())
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

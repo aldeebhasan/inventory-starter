@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e11746e4dfb218f62afb2dc4b8c09239",
+    "content-hash": "c25d29dc03c5ed298648ffa432dd770b",
     "packages": [
         {
             "name": "aldeebhasan/inventorix",
@@ -86,16 +86,16 @@
         },
         {
             "name": "aldeebhasan/panorama",
-            "version": "v0.4.0",
+            "version": "v0.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aldeebhasan/panorama.git",
-                "reference": "95fefd972c32732f69142b0d793c298d44617566"
+                "reference": "9d425b09b13b79c44963e92019f7f451314f30dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aldeebhasan/panorama/zipball/95fefd972c32732f69142b0d793c298d44617566",
-                "reference": "95fefd972c32732f69142b0d793c298d44617566",
+                "url": "https://api.github.com/repos/aldeebhasan/panorama/zipball/9d425b09b13b79c44963e92019f7f451314f30dc",
+                "reference": "9d425b09b13b79c44963e92019f7f451314f30dc",
                 "shasum": ""
             },
             "require": {
@@ -166,7 +166,7 @@
             ],
             "support": {
                 "issues": "https://github.com/aldeebhasan/panorama/issues",
-                "source": "https://github.com/aldeebhasan/panorama/tree/v0.4.0"
+                "source": "https://github.com/aldeebhasan/panorama/tree/v0.5.0"
             },
             "funding": [
                 {
@@ -174,7 +174,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-18T22:34:53+00:00"
+            "time": "2026-11-07T22:10:06+00:00"
         },
         {
             "name": "anourvalar/eloquent-serialize",
